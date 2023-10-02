@@ -1,5 +1,6 @@
 const ws281x = require('rpi-ws281x-native')
 const { io } = require('socket.io-client')
+const sharp = require('sharp')
 
 const classCode = 'd5f5'
 const brightness = 100
@@ -9,6 +10,8 @@ const ip = 'http://172.16.3.103:420'
 const maxPixels = 12
 const gpio = 21
 const stripType = ws281x.stripType.WS2811_RGB
+const HEIGHT = 4
+const WIDTH = 4
 // home
 // const ip = 'http://192.168.0.8:420'
 // const maxPixels = 52
@@ -31,6 +34,59 @@ function fill(color, start = 0, length = pixels.length) {
 
 	for (let i = 0; i < length; i++) {
 		pixels[i + start] = color
+	}
+}
+
+async function stringToImage(string, textColor, backgroundColor) {
+	let safeString = ''
+	let file = ''
+
+	string = string.toUpperCase()
+
+	for (let character of string) {
+		safeString += `&#${character.charCodeAt(0)};`
+
+		if (file) file += '-'
+		file += character.charCodeAt(0)
+	}
+
+	if (file.length >= 50) file = string.length
+
+	let pixels = [[]]
+	try {
+		let image = await sharp({
+			text: {
+				text: safeString,
+				font: 'Consolas',
+				height: HEIGHT,
+				width: WIDTH,
+			}
+		}).threshold()
+
+		// image.toFile(`./images/${file}.png`)
+
+		let buffer = await image.toBuffer()
+
+		let x = 0
+		let y = 0
+
+		for (let i = 0; i < buffer.length; i += 3) {
+			if (x == image.options.input.textWidth) {
+				x = 0
+				y++
+				pixels[y] = []
+			}
+
+			if (buffer[i] == 255)
+				pixels[y][x] = textColor
+			else
+				pixels[y][x] = backgroundColor
+			x++
+		}
+
+		return pixels
+	} catch (error) {
+		console.log(string.charCodeAt(0), string, error)
 	}
 }
 
