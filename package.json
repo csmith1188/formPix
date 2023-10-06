@@ -4,13 +4,17 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon app",
+    "start": "node app"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "nodemon": "^3.0.1",
     "rpi-ws281x-native": "^1.0.4",
+    "sharp": "^0.32.6",
     "socket.io-client": "^4.7.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
   }
 }
