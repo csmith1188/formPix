@@ -8,27 +8,16 @@ const config = JSON.parse(
 	fs.readFileSync('settings.json')
 )
 
-const {
-	ip,
-	api,
-	classCode,
-	brightness,
-	pin,
-	barPixels,
-	stripType
-} = config
-const { boardHeight, boardWidth } = config.board
-
-const maxPixels = barPixels + boardHeight * boardWidth
+const maxPixels = config.barPixels + config.board.height * config.board.width
 
 // set up strip settings
 let strip = ws281x(maxPixels, {
 	dma: 10,
 	freq: 800000,
-	gpio: pin,
+	gpio: config.pin,
 	invert: false,
-	brightness: brightness,
-	stripType: stripType
+	brightness: config.brightness,
+	stripType: ws281x.stripType[config.stripType]
 })
 let pixels = strip.array
 
@@ -83,7 +72,7 @@ function convertTo2DArray(oneDArray, height, width) {
 }
 
 // This function reverses the order of elements in each odd-indexed row of a 2D array
-function reverse2DArray(twoDArray) {
+function reverseOddRowsIn2DArray(twoDArray) {
 	// Iterate over each row in the 2D array
 	for (let row = 0; row < twoDArray.length; row++) {
 		// If the row index is odd (i.e., row is an odd-indexed row)
@@ -123,13 +112,28 @@ async function displayBoard(string, textColor, backgroundColor) {
 			text: {
 				text: string,
 				font: 'Consolas',
-				height: boardHeight,
-				width: boardWidth,
+				height: config.board.height,
+				width: config.board.width,
 			}
 		})
-			.rotate(-90)
-			// .flip() // y-axis
-			.threshold() // sharpen image
+			.threshold() // makes the image binary black/white
+
+		if (config.board.rotate)
+			image = image.rotate(config.board.rotate)
+		if (
+			config.board.flip == 'vertical' ||
+			config.board.flip == 'v' ||
+			config.board.flip == 'both'
+		)
+			image = image.flip()
+		else if (
+			config.board.flip == 'horizontal' ||
+			config.board.flip == 'h' ||
+			config.board.flip == 'both'
+		)
+			image = image.flop()
+
+
 		let metadata = await image.metadata()
 		image.toFile(`./test.png`) // test
 
@@ -144,9 +148,9 @@ async function displayBoard(string, textColor, backgroundColor) {
 		}))
 
 		boardPixels = skipNumber(buffer, 3)
-		boardPixels = convertTo2DArray(boardPixels, boardHeight, boardWidth)
-		boardPixels = transposeArray(boardPixels, boardHeight, boardWidth)
-		boardPixels = reverse2DArray(boardPixels)
+		boardPixels = convertTo2DArray(boardPixels, config.board.height, config.board.width)
+		boardPixels = transposeArray(boardPixels, config.board.height, config.board.width)
+		boardPixels = reverseOddRowsIn2DArray(boardPixels)
 		boardPixels = boardPixels.flat()
 
 		for (let pixel = 0; pixel < boardPixels.length; pixel++) {
@@ -156,7 +160,7 @@ async function displayBoard(string, textColor, backgroundColor) {
 		}
 
 		for (let currentPixel = 0; currentPixel < boardPixels.length; currentPixel++) {
-			pixels[currentPixel + barPixels + 8] = boardPixels[currentPixel]
+			pixels[currentPixel + config.barPixels + 8] = boardPixels[currentPixel]
 		}
 		ws281x.render()
 
@@ -170,10 +174,10 @@ fill(0x000000)
 ws281x.render()
 
 // set web socket url
-const socket = io(ip, {
+const socket = io(config.ip, {
 	query: {
-		api: api,
-		classCode: classCode
+		api: config.api,
+		classCode: config.classCode
 	}
 })
 
@@ -206,8 +210,8 @@ socket.on('vbUpdate', (pollsData) => {
 		return
 	}
 
-	fill(0x808080, 0, barPixels)
-	fill(0x000000, barPixels, boardHeight * boardWidth)
+	fill(0x808080, 0, config.barPixels)
+	fill(0x000000, config.barPixels, config.board.height * config.board.width)
 
 	// convert colors from hex to integers
 	for (let pollData of Object.values(pollsData.polls)) {
@@ -236,7 +240,7 @@ socket.on('vbUpdate', (pollsData) => {
 	}
 
 	if (pollsData.totalStudents <= 0) pixelsPerStudent = 0
-	else pixelsPerStudent = Math.floor((barPixels - nonEmptyPolls) / pollsData.totalStudents) //- nonEmptyPolls
+	else pixelsPerStudent = Math.floor((config.barPixels - nonEmptyPolls) / pollsData.totalStudents) //- nonEmptyPolls
 
 	// add polls
 	let currentPixel = 0
