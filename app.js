@@ -135,7 +135,6 @@ async function displayBoard(string, textColor, backgroundColor) {
 
 
 		let metadata = await image.metadata()
-		image.toFile(`./test.png`) // test
 
 		// get bytes of image
 		let buffer = await image.toBuffer()
@@ -162,7 +161,6 @@ async function displayBoard(string, textColor, backgroundColor) {
 		for (let currentPixel = 0; currentPixel < boardPixels.length; currentPixel++) {
 			pixels[currentPixel + config.barPixels + 8] = boardPixels[currentPixel]
 		}
-		ws281x.render()
 
 	} catch (error) {
 		console.log(string, error)
@@ -206,12 +204,12 @@ socket.on('vbUpdate', (pollsData) => {
 	// if no poll clear pixels
 	if (!pollsData.pollStatus) {
 		fill(0x000000)
+		displayBoard(config.ip, 0xFFFFFF, 0x000000)
 		ws281x.render()
 		return
 	}
 
 	fill(0x808080, 0, config.barPixels)
-	fill(0x000000, config.barPixels, config.board.height * config.board.width)
 
 	// convert colors from hex to integers
 	for (let pollData of Object.values(pollsData.polls)) {
@@ -230,6 +228,17 @@ socket.on('vbUpdate', (pollsData) => {
 		pollsData.blindPoll = false
 		displayBoard('POGS', 0xFF0000, 0x0000FF)
 	}
+
+
+	if (pollsData.pollPrompt == 'Thumbs?') {
+		if (pollsData.polls.UP == pollsData.totalStudents)
+			displayBoard(`MAX GAMER`, 0xFF0000, 0x000000)
+		else
+			displayBoard(`TUTD: ${pollResponses}/${pollsData.totalStudents}`, 0xFFFFFF, 0x000000)
+	}
+	else
+		displayBoard(`POLL: ${pollResponses}/${pollsData.totalStudents}`, 0xFFFFFF, 0x000000)
+
 
 	// count non-empty polls
 	let nonEmptyPolls = -1
