@@ -159,9 +159,10 @@ async function displayBoard(string, textColor, backgroundColor) {
 		}
 
 		for (let currentPixel = 0; currentPixel < boardPixels.length; currentPixel++) {
-			pixels[currentPixel + config.barPixels + 8] = boardPixels[currentPixel]
+			pixels[currentPixel + config.barPixels] = boardPixels[currentPixel]
 		}
 
+		ws281x.render()
 	} catch (error) {
 		console.log(string, error)
 	}
@@ -202,10 +203,9 @@ socket.on('vbUpdate', (pollsData) => {
 	let pixelsPerStudent
 
 	// if no poll clear pixels
-	if (!pollsData.pollStatus) {
+	if (!pollsData.status) {
 		fill(0x000000)
 		displayBoard(config.ip, 0xFFFFFF, 0x000000)
-		ws281x.render()
 		return
 	}
 
@@ -218,6 +218,7 @@ socket.on('vbUpdate', (pollsData) => {
 
 	let pollResponses = 0
 
+
 	// count poll responses
 	for (let poll of Object.values(pollsData.polls)) {
 		pollResponses += poll.responses
@@ -225,13 +226,12 @@ socket.on('vbUpdate', (pollsData) => {
 
 	// if totalStudents = pollResponses turn off blind mode
 	if (pollsData.totalStudents == pollResponses) {
-		pollsData.blindPoll = false
-		displayBoard('POGS', 0xFF0000, 0x0000FF)
+		pollsData.blind = false
 	}
 
 
-	if (pollsData.pollPrompt == 'Thumbs?') {
-		if (pollsData.polls.UP == pollsData.totalStudents)
+	if (pollsData.prompt == 'Thumbs?') {
+		if (pollsData.polls.Up.responses == pollsData.totalStudents)
 			displayBoard(`MAX GAMER`, 0xFF0000, 0x000000)
 		else
 			displayBoard(`TUTD: ${pollResponses}/${pollsData.totalStudents}`, 0xFFFFFF, 0x000000)
@@ -259,7 +259,7 @@ socket.on('vbUpdate', (pollsData) => {
 		// for each response
 		for (let responseNumber = 0; responseNumber < poll.responses; responseNumber++) {
 			let color = poll.color
-			if (pollsData.blindPoll) color = 0xFF8000
+			if (pollsData.blind) color = 0xFF8000
 
 			// set response to color
 			fill(
@@ -281,7 +281,7 @@ socket.on('vbUpdate', (pollsData) => {
 		}
 
 		if (
-			!pollsData.blindPoll &&
+			!pollsData.blind &&
 			poll.responses > 0
 		) currentPixel++
 		pollNumber++
