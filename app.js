@@ -1,14 +1,15 @@
 const ws281x = require('rpi-ws281x-native') // this changes the pixels
 const { io } = require('socket.io-client')
-const sharp = require('sharp') // this converts text to an image
 const fs = require('fs')
+const { letters } = require('./letters.js');
 
 // config
 const config = JSON.parse(
 	fs.readFileSync('settings.json')
 )
 
-const maxPixels = config.barPixels + config.board.height * config.board.width
+// const maxPixels = config.barPixels + config.board.height * config.board.width
+const maxPixels = config.barPixels
 
 // set up strip settings
 let strip = ws281x(maxPixels, {
@@ -31,140 +32,76 @@ function fill(color, start = 0, length = pixels.length) {
 	}
 }
 
-// skips every x item in an array
-function skipNumber(array, skipAmount) {
-	let result = []
+function showString(boardPixels, start, textColor, backgroundColor, repeat) {
+	let currentPixel = config.barPixels
+	let currentColumn = start
+	let maxColumns = 0
 
-	for (let i = 0; i < array.length; i += skipAmount) {
-		result.push(array[i])
-	}
-
-	return result
-}
-
-// This function converts a 1D array into a 2D array with a specified height and width
-function convertTo2DArray(oneDArray, height, width) {
-	// Initialize a 2D array with the specified height and width, filled with 0s
-	let twoDArray = new Array(height).fill(null).map(() => new Array(width).fill(0))
-	// Initialize an index to keep track of the current element in the 1D array
-	let index = 0
-
-	// Iterate over the columns of the 2D array
-	for (let col = 0; col < width; col++) {
-		// Iterate over the rows of the 2D array
-		for (let row = 0; row < height; row++) {
-			// If the current index is within the bounds of the 1D array,
-			if (index < oneDArray.length) {
-				// assign the current element to the current position in the 2D array
-				twoDArray[row][col] = oneDArray[index]
-				// increment the index
-				index++
-			} else {
-				// If the current index is out of bounds of the 1D array,
-				// assign null to the current position in the 2D array
-				twoDArray[row][col] = null
-			}
+	console.log(start, start % 2);
+	if (start % 2 == 1) {
+		for (let col of boardPixels) {
+			col.reverse()
 		}
 	}
 
-	// Return the 2D array
-	return twoDArray
-}
 
-// This function reverses the order of elements in each odd-indexed row of a 2D array
-function reverseOddRowsIn2DArray(twoDArray) {
-	// Iterate over each row in the 2D array
-	for (let row = 0; row < twoDArray.length; row++) {
-		// If the row index is odd (i.e., row is an odd-indexed row)
-		if (row % 2 == 1) {
-			// Reverse the order of elements in the row
-			twoDArray[row].reverse()
-		}
+	if (repeat) {
+		maxColumns = config.board.width
 	}
-	// Return the modified 2D array
-	return twoDArray
-}
+	else maxColumns = boardPixels.length
 
-// This function transposes a 2D array, i.e., it swaps its rows and columns
-function transposeArray(array, height, width) {
-	// Initialize a new 2D array filled with 0s, with dimensions (width x height)
-	let transposedArray = Array.from({ length: width }, () => Array(height).fill(0))
-	// Iterate over each row in the original 2D array
-	for (let row = 0; row < height; row++) {
-		// Iterate over each column in the original 2D array
-		for (let col = 0; col < width; col++) {
-			// Copy the element from the original 2D array to the transposed 2D array
-			// but in a transposed manner, i.e., array[row][col] becomes transposedArray[col][row]
-			transposedArray[col][row] = array[row][col]
+	for (let i = 0; i < maxColumns; i++) {
+		let col = boardPixels[currentColumn]
+
+		for (let pixel of col) {
+			if (pixel)
+				pixels[currentPixel] = textColor
+			else
+				pixels[currentPixel] = backgroundColor
+			currentPixel++
 		}
+
+		currentColumn++
+		if (currentColumn >= boardPixels.length) currentColumn = 0
 	}
-	// Return the transposed 2D array
-	return transposedArray
 }
 
-// convert string to image
-async function displayBoard(string, textColor, backgroundColor) {
+function displayBoard(string, textColor, backgroundColor) {
+	string = string.toLowerCase()
+
 	let boardPixels = []
+	for (let i = 0; i < string.length; i++) {
+		let letter = string[i]
+		let letterImage = letters[letter]
 
-	try {
-		// convert the string to an image
-		let image = await sharp({
-			text: {
-				text: string,
-				font: 'Consolas',
-				height: config.board.height,
-				width: config.board.width,
-			}
-		})
-			.threshold() // makes the image binary black/white
-
-		if (config.board.rotate)
-			image = image.rotate(config.board.rotate)
-		if (
-			config.board.flip == 'vertical' ||
-			config.board.flip == 'v' ||
-			config.board.flip == 'both'
-		)
-			image = image.flip()
-		else if (
-			config.board.flip == 'horizontal' ||
-			config.board.flip == 'h' ||
-			config.board.flip == 'both'
-		)
-			image = image.flop()
-
-
-		let metadata = await image.metadata()
-
-		// get bytes of image
-		let buffer = await image.toBuffer()
-
-		let x = 0
-		let y = 0
-		fs.writeFileSync('test.json', JSON.stringify({
-			metadata: metadata,
-			buffer: buffer
-		}))
-
-		boardPixels = skipNumber(buffer, 3)
-		boardPixels = convertTo2DArray(boardPixels, config.board.height, config.board.width)
-		boardPixels = transposeArray(boardPixels, config.board.height, config.board.width)
-		boardPixels = reverseOddRowsIn2DArray(boardPixels)
-		boardPixels = boardPixels.flat()
-
-		for (let pixel = 0; pixel < boardPixels.length; pixel++) {
-			if (boardPixels[pixel] == 255) boardPixels[pixel] = textColor
-			else if (boardPixels[pixel] == 0) boardPixels[pixel] = backgroundColor
-			else boardPixels[pixel] = 0x000000
+		for (let col of letterImage) {
+			boardPixels.push(col)
 		}
+		boardPixels.push(Array(8).fill(0))
+	}
 
-		for (let currentPixel = 0; currentPixel < boardPixels.length; currentPixel++) {
-			pixels[currentPixel + config.barPixels] = boardPixels[currentPixel]
-		}
+	for (let i = 0; i < boardPixels.length; i++) {
+		let col = boardPixels[i]
+
+		if (i % 2 == 0)
+			col = col.reverse()
+	}
+
+	if (boardPixels.length < config.board.width) {
+		showString(boardPixels, 0, textColor, backgroundColor, false)
 
 		ws281x.render()
-	} catch (error) {
-		console.log(string, error)
+	} else {
+		let startColumn = 0
+
+		setInterval(() => {
+			showString(boardPixels, startColumn, textColor, backgroundColor, true)
+
+			startColumn++
+			if (startColumn >= boardPixels.length) startColumn = 0
+
+			ws281x.render()
+		}, 1000);
 	}
 }
 
@@ -181,8 +118,8 @@ const socket = io(config.ip, {
 })
 
 // when there is a connection error it tys to reconnect
-socket.on('connect_error', (err) => {
-	console.log('connection error')
+socket.on('connect_error', (error) => {
+	console.log(error.message);
 
 	fill(0x000000)
 	ws281x.render()
@@ -205,7 +142,7 @@ socket.on('vbUpdate', (pollsData) => {
 	// if no poll clear pixels
 	if (!pollsData.status) {
 		fill(0x000000)
-		displayBoard(config.ip, 0xFFFFFF, 0x000000)
+		// displayBoard(config.ip, 0xFFFFFF, 0x000000)
 		return
 	}
 
@@ -230,14 +167,14 @@ socket.on('vbUpdate', (pollsData) => {
 	}
 
 
-	if (pollsData.prompt == 'Thumbs?') {
-		if (pollsData.polls.Up.responses == pollsData.totalStudents)
-			displayBoard(`MAX GAMER`, 0xFF0000, 0x000000)
-		else
-			displayBoard(`TUTD: ${pollResponses}/${pollsData.totalStudents}`, 0xFFFFFF, 0x000000)
-	}
-	else
-		displayBoard(`POLL: ${pollResponses}/${pollsData.totalStudents}`, 0xFFFFFF, 0x000000)
+	// if (pollsData.prompt == 'Thumbs?') {
+	// 	if (pollsData.polls.Up.responses == pollsData.totalStudents)
+	// 		displayBoard(`MAX GAMER`, 0xFF0000, 0x000000)
+	// 	else
+	// 		displayBoard(`TUTD: ${pollResponses}/${pollsData.totalStudents}`, 0xFFFFFF, 0x000000)
+	// }
+	// else
+	// 	displayBoard(`POLL: ${pollResponses}/${pollsData.totalStudents}`, 0xFFFFFF, 0x000000)
 
 
 	// count non-empty polls

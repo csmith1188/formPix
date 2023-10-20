@@ -5,11 +5,5 @@
 	"brightness": 0,
 	"pin": 0,
 	"barPixels": 0,
-	"board": {
-		"height": 0,
-		"width": 0,
-		"rotate": 0,
-		"flip": false
-	},
 	"stripType": ""
 }
