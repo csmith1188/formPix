@@ -3,6 +3,8 @@ const { io } = require('socket.io-client')
 const fs = require('fs')
 const { letters } = require('./letters.js');
 
+let classCode = ''
+
 // config
 const config = JSON.parse(
 	fs.readFileSync('settings.json')
@@ -112,8 +114,7 @@ ws281x.render()
 // set web socket url
 const socket = io(config.ip, {
 	query: {
-		api: config.api,
-		classCode: config.classCode
+		api: config.api
 	}
 })
 
@@ -132,7 +133,26 @@ socket.on('connect_error', (error) => {
 // when it connects to formBar it ask for the bars data
 socket.on('connect', () => {
 	console.log('connected')
-	socket.emit('vbUpdate')
+	socket.emit('getUserClass', { api: config.api })
+})
+
+socket.on('getUserClass', (userClass) => {
+	if (userClass.error) {
+		console.log(userClass.error)
+		setTimeout(() => {
+			socket.emit('getUserClass', { api: config.api })
+		}, 5000)
+	}
+	else {
+		if (classCode != 'noClass') classCode = userClass
+		socket.emit('joinRoom', classCode)
+	}
+})
+
+socket.on('classEnded', () => {
+	socket.leave(classCode)
+	classCode = ''
+	socket.emit('getUserClass', { api: config.api })
 })
 
 // when the bar changes
