@@ -3,7 +3,7 @@ const { io } = require('socket.io-client')
 const fs = require('fs')
 const { letters } = require('./letters.js');
 
-let classCode = ''
+let classCode = 'noClass'
 
 // config
 const config = JSON.parse(
@@ -39,7 +39,6 @@ function showString(boardPixels, start, textColor, backgroundColor, repeat) {
 	let currentColumn = start
 	let maxColumns = 0
 
-	console.log(start, start % 2);
 	if (start % 2 == 1) {
 		for (let col of boardPixels) {
 			col.reverse()
@@ -120,7 +119,8 @@ const socket = io(config.ip, {
 
 // when there is a connection error it tys to reconnect
 socket.on('connect_error', (error) => {
-	console.log(error.message);
+	if (error.message == 'xhr poll error') console.log('no connection');
+	else console.log(error.message);
 
 	fill(0x000000)
 	ws281x.render()
@@ -141,18 +141,26 @@ socket.on('getUserClass', (userClass) => {
 		console.log(userClass.error)
 		setTimeout(() => {
 			socket.emit('getUserClass', { api: config.api })
-		}, 5000)
+		}, 3000)
 	}
-	else {
-		if (classCode != 'noClass') classCode = userClass
+	else if (userClass) {
+		classCode = userClass
 		socket.emit('joinRoom', classCode)
 	}
 })
 
 socket.on('classEnded', () => {
-	socket.leave(classCode)
+	socket.emit('leave', classCode)
 	classCode = ''
 	socket.emit('getUserClass', { api: config.api })
+	fill(0x000000)
+	ws281x.render()
+})
+
+socket.on('joinRoom', (classCode) => {
+	if (classCode) {
+		socket.emit('vbUpdate')
+	}
 })
 
 // when the bar changes
@@ -163,6 +171,7 @@ socket.on('vbUpdate', (pollsData) => {
 	if (!pollsData.status) {
 		fill(0x000000)
 		// displayBoard(config.ip, 0xFFFFFF, 0x000000)
+		ws281x.render()
 		return
 	}
 
