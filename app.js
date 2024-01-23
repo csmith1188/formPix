@@ -136,8 +136,6 @@ socket.on('connect', () => {
 })
 
 socket.on('setClass', (userClass) => {
-	console.log('setClass', userClass);
-
 	if (userClass == 'noClass') {
 		classCode = ''
 		fill(0x000000)
@@ -150,8 +148,6 @@ socket.on('setClass', (userClass) => {
 
 // when the bar changes
 socket.on('vbUpdate', (pollsData) => {
-	console.log('vbUpdate', pollsData);
-
 	let pixelsPerStudent
 
 	// if no poll clear pixels
