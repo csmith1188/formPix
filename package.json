@@ -1,9 +1,8 @@
 {
-  "name": "formlights",
+  "name": "formPix",
   "version": "1.0.0",
   "description": "",
   "main": "app.js",
-  "type": "module",
   "scripts": {
     "dev": "nodemon app",
     "start": "node app"

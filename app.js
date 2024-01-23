@@ -112,7 +112,7 @@ ws281x.render()
 
 // set web socket url
 const socket = io(config.ip, {
-	query: {
+	extraHeaders: {
 		api: config.api
 	}
 })
@@ -133,38 +133,25 @@ socket.on('connect_error', (error) => {
 // when it connects to formBar it ask for the bars data
 socket.on('connect', () => {
 	console.log('connected')
-	socket.emit('getUserClass', { api: config.api })
 })
 
-socket.on('getUserClass', (userClass) => {
-	if (userClass.error) {
-		console.log(userClass.error)
-		setTimeout(() => {
-			socket.emit('getUserClass', { api: config.api })
-		}, 3000)
-	}
-	else if (userClass) {
+socket.on('setClass', (userClass) => {
+	console.log('setClass', userClass);
+
+	if (userClass == 'noClass') {
+		classCode = ''
+		fill(0x000000)
+		ws281x.render()
+	} else {
 		classCode = userClass
-		socket.emit('joinRoom', classCode)
-	}
-})
-
-socket.on('classEnded', () => {
-	socket.emit('leave', classCode)
-	classCode = ''
-	socket.emit('getUserClass', { api: config.api })
-	fill(0x000000)
-	ws281x.render()
-})
-
-socket.on('joinRoom', (classCode) => {
-	if (classCode) {
 		socket.emit('vbUpdate')
 	}
 })
 
 // when the bar changes
 socket.on('vbUpdate', (pollsData) => {
+	console.log('vbUpdate', pollsData);
+
 	let pixelsPerStudent
 
 	// if no poll clear pixels
