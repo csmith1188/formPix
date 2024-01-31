@@ -10,7 +10,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "node-aplay": "^1.0.3",
     "play-sound": "^1.1.6",
     "rpi-ws281x-native": "^1.0.4",
     "socket.io-client": "^4.7.2"
