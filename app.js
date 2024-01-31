@@ -3,9 +3,7 @@ const { io } = require('socket.io-client')
 const fs = require('fs')
 const { letters } = require('./letters.js')
 const util = require('util');
-const player = require('play-sound')(opts = {
-	player: 'play'
-})
+const player = require('play-sound')()
 
 let classCode = 'noClass'
 
@@ -26,8 +24,9 @@ let strip = ws281x(maxPixels, {
 	brightness: config.brightness,
 	stripType: ws281x.stripType[config.stripType]
 })
-let pixels = strip.array
 
+// variables
+let pixels = strip.array
 let pollData = {}
 
 // Functions
