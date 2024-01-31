@@ -1,7 +1,11 @@
 const ws281x = require('rpi-ws281x-native') // this changes the pixels
 const { io } = require('socket.io-client')
 const fs = require('fs')
-const { letters } = require('./letters.js');
+const { letters } = require('./letters.js')
+const util = require('util');
+const player = require('play-sound')(opts = {
+	player: 'play'
+})
 
 let classCode = 'noClass'
 
@@ -24,6 +28,9 @@ let strip = ws281x(maxPixels, {
 })
 let pixels = strip.array
 
+let pollData = {}
+
+// Functions
 // fill strip with color
 // by default start is 0 and length is the whole strip
 function fill(color, start = 0, length = pixels.length) {
@@ -147,11 +154,11 @@ socket.on('setClass', (userClass) => {
 })
 
 // when the bar changes
-socket.on('vbUpdate', (pollsData) => {
+socket.on('vbUpdate', (newPollData) => {
 	let pixelsPerStudent
 
 	// if no poll clear pixels
-	if (!pollsData.status) {
+	if (!newPollData.status) {
 		fill(0x000000)
 		// displayBoard(config.ip, 0xFFFFFF, 0x000000)
 		ws281x.render()
@@ -161,54 +168,55 @@ socket.on('vbUpdate', (pollsData) => {
 	fill(0x808080, 0, config.barPixels)
 
 	// convert colors from hex to integers
-	for (let pollData of Object.values(pollsData.polls)) {
-		pollData.color = parseInt(pollData.color.slice(1), 16)
+	for (let poll of Object.values(newPollData.polls)) {
+		poll.color = parseInt(poll.color.slice(1), 16)
 	}
 
 	let pollResponses = 0
 
 
 	// count poll responses
-	for (let poll of Object.values(pollsData.polls)) {
+	for (let poll of Object.values(newPollData.polls)) {
 		pollResponses += poll.responses
 	}
 
 	// if totalStudents = pollResponses turn off blind mode
-	if (pollsData.totalStudents == pollResponses) {
-		pollsData.blind = false
+	if (newPollData.totalStudents == pollResponses) {
+		newPollData.blind = false
 	}
 
-
-	// if (pollsData.prompt == 'Thumbs?') {
-	// 	if (pollsData.polls.Up.responses == pollsData.totalStudents)
-	// 		displayBoard(`MAX GAMER`, 0xFF0000, 0x000000)
-	// 	else
-	// 		displayBoard(`TUTD: ${pollResponses}/${pollsData.totalStudents}`, 0xFFFFFF, 0x000000)
-	// }
-	// else
-	// 	displayBoard(`POLL: ${pollResponses}/${pollsData.totalStudents}`, 0xFFFFFF, 0x000000)
-
+	if (!util.isDeepStrictEqual(newPollData.polls, pollData.polls)) {
+		if (newPollData.prompt == 'Thumbs?') {
+			if (newPollData.polls.Up.responses == newPollData.totalStudents) {
+				player.play('./sfx/sfx_success01.wav')
+			} else if (newPollData.polls.Wiggle.responses == newPollData.totalStudents) {
+				player.play('./sfx/bruh.wav')
+			} else if (newPollData.polls.Down.responses == newPollData.totalStudents) {
+				player.play('./sfx/wompwomp.wav')
+			}
+		}
+	}
 
 	// count non-empty polls
 	let nonEmptyPolls = -1
-	for (let poll of Object.values(pollsData.polls)) {
+	for (let poll of Object.values(newPollData.polls)) {
 		if (poll.responses > 0) {
 			nonEmptyPolls++
 		}
 	}
 
-	if (pollsData.totalStudents <= 0) pixelsPerStudent = 0
-	else pixelsPerStudent = Math.floor((config.barPixels - nonEmptyPolls) / pollsData.totalStudents) //- nonEmptyPolls
+	if (newPollData.totalStudents <= 0) pixelsPerStudent = 0
+	else pixelsPerStudent = Math.floor((config.barPixels - nonEmptyPolls) / newPollData.totalStudents) //- nonEmptyPolls
 
 	// add polls
 	let currentPixel = 0
 	let pollNumber = 0
 
-	for (let [name, poll] of Object.entries(pollsData.polls)) {
+	for (let [name, poll] of Object.entries(newPollData.polls)) {
 		// for each response
 		for (let responseNumber = 0; responseNumber < poll.responses; responseNumber++) {
 			let color = poll.color
-			if (pollsData.blind) color = 0xFF8000
+			if (newPollData.blind) color = 0xFF8000
 
 			// set response to color
 			fill(
@@ -230,11 +238,29 @@ socket.on('vbUpdate', (pollsData) => {
 		}
 
 		if (
-			!pollsData.blind &&
+			!newPollData.blind &&
 			poll.responses > 0
 		) currentPixel++
 		pollNumber++
 	}
 
+	pollData = newPollData
+
 	ws281x.render()
+})
+
+socket.on('helpSound', () => {
+	player.play('./sfx/sfx_up04.wav')
+})
+
+socket.on('breakSound', () => {
+	player.play('./sfx/sfx_pickup02.wav')
+})
+
+socket.on('pollSound', () => {
+	player.play('./sfx/sfx_blip01.wav')
+})
+
+socket.on('joinSound', () => {
+	player.play('./sfx/sfx_up02.wav')
 })
