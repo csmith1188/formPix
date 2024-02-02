@@ -98,19 +98,23 @@ function gradient(startColor, endColor, start = 0, length = pixels.length) {
 	// If the specified length is greater than the length of the pixels array, set it to the length of the pixels array
 	if (length >= pixels.length) length = pixels.length
 
+
 	// Calculate the step color, which is the amount of change in each color component per step
 	let stepColor = startColor.map((start, i) => (endColor[i] - start) / length)
 
 	// Loop over the length of the gradient
 	for (let i = 0; i < length; i++) {
-		// Log the current color in hexadecimal format
-		console.log(rgbToHex(currentColor));
-
 		// Set the pixel at the current position to the current color
 		pixels[i + start] = rgbToHex(currentColor);
 
 		// Update the current color by adding the step color to the start color
-		currentColor = startColor.map((start, j) => Math.round(currentColor[j] + stepColor[j]))
+		currentColor = startColor.map((start, j) => {
+			let colorValue = Math.round(currentColor[j] + stepColor[j])
+
+			if (colorValue > 255) colorValue = 255
+			if (colorValue < 0) colorValue = 0
+			return colorValue
+		})
 	}
 }
 
@@ -281,9 +285,9 @@ socket.on('vbUpdate', (newPollData) => {
 		if (newPollData.totalStudents == pollResponses) {
 			if (newPollData.prompt == 'Thumbs?') {
 				if (newPollData.polls.Up.responses == newPollData.totalStudents) {
+					gradient(0x0000FF, 0xFF0000, 0, config.barPixels)
 					displayBoard('Max Gamer', 0xFF0000, 0x000000)
 					player.play('./sfx/sfx_success01.wav')
-					gradient(0x0000FF, 0xFF0000, 0, config.barPixels)
 					return
 				} else if (newPollData.polls.Wiggle.responses == newPollData.totalStudents) {
 					player.play('./sfx/bruh.wav')
