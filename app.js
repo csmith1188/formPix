@@ -173,6 +173,7 @@ function displayBoard(string, textColor, backgroundColor) {
 
 	// Convert each letter in the string to its pixel representation
 	for (let letter of string) {
+		if (!letters[letter]) continue
 		let letterImage = letters[letter].map(arr => arr.slice());
 
 		// Add the letter's pixels to the board
