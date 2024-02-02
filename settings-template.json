@@ -4,5 +4,8 @@
 	"brightness": 0,
 	"pin": 0,
 	"barPixels": 0,
-	"stripType": ""
+	"stripType": "",
+	"board": {
+		"amount": 1
+	}
 }
