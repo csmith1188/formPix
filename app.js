@@ -281,29 +281,30 @@ socket.on('vbUpdate', (newPollData) => {
 		newPollData.blind = false
 	}
 
-	if (!util.isDeepStrictEqual(newPollData.polls, pollData.polls)) {
-		if (newPollData.totalStudents == pollResponses) {
-			if (newPollData.prompt == 'Thumbs?') {
-				if (newPollData.polls.Up.responses == newPollData.totalStudents) {
-					gradient(0x0000FF, 0xFF0000, 0, config.barPixels)
-					displayBoard('Max Gamer', 0xFF0000, 0x000000)
-					player.play('./sfx/sfx_success01.wav')
-					return
-				} else if (newPollData.polls.Wiggle.responses == newPollData.totalStudents) {
-					player.play('./sfx/bruh.wav')
-				} else if (newPollData.polls.Down.responses == newPollData.totalStudents) {
-					player.play('./sfx/wompwomp.wav')
-					displayBoard('Git Gud', 0xFF0000, 0x000000)
-				}
+	if (util.isDeepStrictEqual(newPollData.polls, pollData.polls)) return
+
+	if (newPollData.totalStudents == pollResponses) {
+		if (newPollData.prompt == 'Thumbs?') {
+			if (newPollData.polls.Up.responses == newPollData.totalStudents) {
+				gradient(0x0000FF, 0xFF0000, 0, config.barPixels)
+				displayBoard('Max Gamer', 0xFF0000, 0x000000)
+				player.play('./sfx/sfx_success01.wav')
+				pollData = newPollData
+				return
+			} else if (newPollData.polls.Wiggle.responses == newPollData.totalStudents) {
+				player.play('./sfx/bruh.wav')
+			} else if (newPollData.polls.Down.responses == newPollData.totalStudents) {
+				player.play('./sfx/wompwomp.wav')
+				displayBoard('Git Gud', 0xFF0000, 0x000000)
 			}
-		} else {
-			if (newPollData.prompt) text += newPollData.prompt
-			else text += 'Poll'
-
-			text += ` ${pollResponses}/${newPollData.totalStudents}`
-
-			displayBoard(text, 0xFFFFFF, 0x000000)
 		}
+	} else {
+		if (newPollData.prompt) text += newPollData.prompt
+		else text += 'Poll'
+
+		text += ` ${pollResponses}/${newPollData.totalStudents}`
+
+		displayBoard(text, 0xFFFFFF, 0x000000)
 	}
 
 	// count non-empty polls
