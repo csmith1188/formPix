@@ -258,8 +258,9 @@ socket.on('vbUpdate', (newPollData) => {
 	// if no poll clear pixels
 	if (!newPollData.status) {
 		fill(0x000000)
-		displayBoard(config.ip, 0xFFFFFF, 0x000000)
+		displayBoard(config.ip.split('://')[1], 0xFFFFFF, 0x000000)
 		ws281x.render()
+		pollData = newPollData
 		return
 	}
 
@@ -283,6 +284,8 @@ socket.on('vbUpdate', (newPollData) => {
 
 	if (util.isDeepStrictEqual(newPollData.polls, pollData.polls)) return
 
+	clearInterval(textInterval)
+
 	if (newPollData.totalStudents == pollResponses) {
 		if (newPollData.prompt == 'Thumbs?') {
 			if (newPollData.polls.Up.responses == newPollData.totalStudents) {
@@ -298,14 +301,14 @@ socket.on('vbUpdate', (newPollData) => {
 				displayBoard('Git Gud', 0xFF0000, 0x000000)
 			}
 		}
-	} else {
-		if (newPollData.prompt) text += newPollData.prompt
-		else text += 'Poll'
-
-		text += ` ${pollResponses}/${newPollData.totalStudents}`
-
-		displayBoard(text, 0xFFFFFF, 0x000000)
 	}
+
+	if (newPollData.prompt) text += newPollData.prompt
+	else text += 'Poll'
+
+	text += ` ${pollResponses}/${newPollData.totalStudents}`
+
+	displayBoard(text, 0xFFFFFF, 0x000000)
 
 	// count non-empty polls
 	let nonEmptyPolls = -1
