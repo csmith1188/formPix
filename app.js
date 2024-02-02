@@ -7,7 +7,7 @@ const player = require('play-sound')()
 
 
 // Constants
-const BOARD_WIDTH = 30
+const BOARD_WIDTH = 32
 const BOARD_HEIGHT = 8
 
 
