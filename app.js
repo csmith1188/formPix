@@ -34,6 +34,7 @@ let pixels = strip.array
 let classCode = 'noClass'
 let pollData = {}
 let textInterval = null
+let currentText = ''
 
 
 // Functions
@@ -169,6 +170,10 @@ function displayBoard(string, textColor, backgroundColor) {
 	string = string.toLowerCase();
 	let boardPixels = [Array(8).fill(0)];
 
+	if (currentText == string) return
+
+	currentText = string
+
 	clearInterval(textInterval);
 
 	// Convert each letter in the string to its pixel representation
@@ -258,7 +263,6 @@ socket.on('vbUpdate', (newPollData) => {
 
 	// if no poll clear pixels
 	if (!newPollData.status) {
-		fill(0x000000)
 		displayBoard(config.ip.split('://')[1], 0xFFFFFF, 0x000000)
 		ws281x.render()
 		pollData = newPollData
