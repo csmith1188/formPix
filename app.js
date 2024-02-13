@@ -15,7 +15,7 @@ const BOARD_HEIGHT = 8
 const config = JSON.parse(
 	fs.readFileSync('settings.json')
 )
-const maxPixels = config.barPixels + config.board.amount * BOARD_WIDTH * BOARD_HEIGHT
+const maxPixels = config.barPixels + config.boards * BOARD_WIDTH * BOARD_HEIGHT
 
 
 // set up strip settings
@@ -191,7 +191,7 @@ function displayBoard(string, textColor, backgroundColor) {
 	}
 
 	// If the board is wide enough to display the entire string at once
-	if (boardPixels.length <= config.board.amount * BOARD_WIDTH) {
+	if (boardPixels.length <= config.boards * BOARD_WIDTH) {
 		showString(boardPixels, 0, textColor, backgroundColor);
 		ws281x.render();
 	} else {
