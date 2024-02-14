@@ -247,8 +247,6 @@ socket.on('connect', () => {
 })
 
 socket.on('setClass', (userClass) => {
-	console.log('setClass', userClass);
-
 	if (userClass == 'noClass') {
 		classCode = ''
 		fill(0x000000)
