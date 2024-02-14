@@ -3,7 +3,7 @@ const { io } = require('socket.io-client')
 const fs = require('fs')
 const { letters } = require('./letters.js')
 const util = require('util');
-const player = require('play-sound')()
+const player = require('play-sound')({ players: ['cvlc', 'omxplayer'] })
 
 
 // Constants
@@ -242,9 +242,13 @@ socket.on('connect_error', (error) => {
 // when it connects to formBar it ask for the bars data
 socket.on('connect', () => {
 	console.log('connected')
+	displayBoard(config.ip.split('://')[1], 0xFFFFFF, 0x000000)
+	player.play('./sfx/sfx_bootup02.wav')
 })
 
 socket.on('setClass', (userClass) => {
+	console.log('setClass', userClass);
+
 	if (userClass == 'noClass') {
 		classCode = ''
 		fill(0x000000)
@@ -375,6 +379,22 @@ socket.on('pollSound', () => {
 	player.play('./sfx/sfx_blip01.wav')
 })
 
+socket.on('removePollSound', () => {
+	player.play('./sfx/sfx_hit01.wav')
+})
+
 socket.on('joinSound', () => {
 	player.play('./sfx/sfx_up02.wav')
+})
+
+socket.on('leaveSound', () => {
+	player.play('./sfx/sfx_laser01.wav')
+})
+
+socket.on('kickStudentsSound', () => {
+	player.play('./sfx/sfx_splash01.wav')
+})
+
+socket.on('endClassSound', () => {
+	player.play('./sfx/sfx_explode01.wav')
 })
