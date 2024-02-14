@@ -289,9 +289,7 @@ socket.on('vbUpdate', (newPollData) => {
 		newPollData.blind = false
 	}
 
-	if (util.isDeepStrictEqual(newPollData.polls, pollData.polls)) return
-
-	clearInterval(textInterval)
+	if (util.isDeepStrictEqual(newPollData, pollData)) return
 
 	if (newPollData.totalStudents == pollResponses) {
 		if (newPollData.prompt == 'Thumbs?') {
