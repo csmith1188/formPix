@@ -3,9 +3,7 @@
 	"api": "",
 	"brightness": 0,
 	"pin": 0,
-	"barPixels": 0,
 	"stripType": "",
-	"board": {
-		"amount": 1
-	}
+	"barPixels": 0,
+	"boards": 0
 }

@@ -3,7 +3,7 @@ const { io } = require('socket.io-client')
 const fs = require('fs')
 const { letters } = require('./letters.js')
 const util = require('util');
-const player = require('play-sound')()
+const player = require('play-sound')({ players: ['cvlc', 'omxplayer'] })
 
 
 // Constants
@@ -15,7 +15,7 @@ const BOARD_HEIGHT = 8
 const config = JSON.parse(
 	fs.readFileSync('settings.json')
 )
-const maxPixels = config.barPixels + config.board.amount * BOARD_WIDTH * BOARD_HEIGHT
+const maxPixels = config.barPixels + config.boards * BOARD_WIDTH * BOARD_HEIGHT
 
 
 // set up strip settings
@@ -191,7 +191,7 @@ function displayBoard(string, textColor, backgroundColor) {
 	}
 
 	// If the board is wide enough to display the entire string at once
-	if (boardPixels.length <= config.board.amount * BOARD_WIDTH) {
+	if (boardPixels.length <= config.boards * BOARD_WIDTH) {
 		showString(boardPixels, 0, textColor, backgroundColor);
 		ws281x.render();
 	} else {
@@ -242,6 +242,8 @@ socket.on('connect_error', (error) => {
 // when it connects to formBar it ask for the bars data
 socket.on('connect', () => {
 	console.log('connected')
+	displayBoard(config.ip.split('://')[1], 0xFFFFFF, 0x000000)
+	player.play('./sfx/sfx_bootup02.wav')
 })
 
 socket.on('setClass', (userClass) => {
@@ -287,9 +289,7 @@ socket.on('vbUpdate', (newPollData) => {
 		newPollData.blind = false
 	}
 
-	if (util.isDeepStrictEqual(newPollData.polls, pollData.polls)) return
-
-	clearInterval(textInterval)
+	if (util.isDeepStrictEqual(newPollData, pollData)) return
 
 	if (newPollData.totalStudents == pollResponses) {
 		if (newPollData.prompt == 'Thumbs?') {
@@ -375,6 +375,22 @@ socket.on('pollSound', () => {
 	player.play('./sfx/sfx_blip01.wav')
 })
 
+socket.on('removePollSound', () => {
+	player.play('./sfx/sfx_hit01.wav')
+})
+
 socket.on('joinSound', () => {
 	player.play('./sfx/sfx_up02.wav')
+})
+
+socket.on('leaveSound', () => {
+	player.play('./sfx/sfx_laser01.wav')
+})
+
+socket.on('kickStudentsSound', () => {
+	player.play('./sfx/sfx_splash01.wav')
+})
+
+socket.on('endClassSound', () => {
+	player.play('./sfx/sfx_explode01.wav')
 })
