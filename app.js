@@ -3,7 +3,7 @@ const { io } = require('socket.io-client')
 const fs = require('fs')
 const { letters } = require('./letters.js')
 const util = require('util');
-const player = require('play-sound')({ players: ['cvlc', 'omxplayer'] })
+const player = require('play-sound')({ player: 'omxplayer' })
 
 
 // Constants
@@ -166,11 +166,11 @@ function showString(boardPixels, start, textColor, backgroundColor) {
  * @param {string} textColor - The color of the text.
  * @param {string} backgroundColor - The color of the background.
  */
-function displayBoard(string, textColor, backgroundColor) {
+function displayBoard(string, textColor, backgroundColor, forced = false) {
 	string = string.toLowerCase();
 	let boardPixels = [Array(8).fill(0)];
 
-	if (currentText == string) return
+	if (currentText == string && !forced) return
 
 	currentText = string
 
@@ -242,7 +242,7 @@ socket.on('connect_error', (error) => {
 // when it connects to formBar it ask for the bars data
 socket.on('connect', () => {
 	console.log('connected')
-	displayBoard(config.ip.split('://')[1], 0xFFFFFF, 0x000000)
+	displayBoard(config.ip.split('://')[1], 0xFFFFFF, 0x000000, true)
 	player.play('./sfx/sfx_bootup02.wav')
 })
 
@@ -250,6 +250,7 @@ socket.on('setClass', (userClass) => {
 	if (userClass == 'noClass') {
 		classCode = ''
 		fill(0x000000)
+		displayBoard(config.ip.split('://')[1], 0xFFFFFF, 0x000000, true)
 		ws281x.render()
 	} else {
 		classCode = userClass
