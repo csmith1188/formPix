@@ -99,7 +99,6 @@ function gradient(startColor, endColor, start = 0, length = pixels.length) {
 	// If the specified length is greater than the length of the pixels array, set it to the length of the pixels array
 	length = Math.floor(length)
 	if (length >= pixels.length - start) length = pixels.length - start
-	console.log(length);
 
 	// Calculate the step color, which is the amount of change in each color component per step
 	let stepColor = startColor.map((start, i) => (endColor[i] - start) / (length - 1))
