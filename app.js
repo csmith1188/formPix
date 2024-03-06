@@ -1,4 +1,6 @@
 const ws281x = require('rpi-ws281x-native') // this changes the pixels
+const http = require('http');
+const express = require('express')
 const { io } = require('socket.io-client')
 const fs = require('fs')
 const { letters } = require('./letters.js')
@@ -15,8 +17,8 @@ const BOARD_HEIGHT = 8
 const config = JSON.parse(
 	fs.readFileSync('settings.json')
 )
-const maxPixels = config.barPixels + config.boards * BOARD_WIDTH * BOARD_HEIGHT
 
+const maxPixels = config.barPixels + config.boards * BOARD_WIDTH * BOARD_HEIGHT
 
 // set up strip settings
 let strip = ws281x(maxPixels, {
@@ -31,27 +33,52 @@ let strip = ws281x(maxPixels, {
 
 // Variables
 let pixels = strip.array
-let classCode = 'noClass'
+let connected = false
+let classCode = ''
 let pollData = {}
 let textInterval = null
 let currentText = ''
 
 
+// Set Up
+// clear pixels
+fill(0x000000)
+ws281x.render()
+
+// set web socket url
+const app = express()
+const httpServer = http.createServer(app)
+
+const socket = io(config.ip, {
+	extraHeaders: {
+		api: config.api
+	}
+})
+
+
 // Functions
-// fill strip with color
-// by default start is 0 and length is the whole strip
 /**
- * Fills a portion of the pixel array with a specified color.
+ * Fills a portion of the pixels array with a specified color.
  *
- * @param {string} color - The color to fill with.
- * @param {number} [start=0] - The starting index in the pixel array.
- * @param {number} [length=pixels.length] - The number of pixels to fill.
+ * @param {string} color - The color to fill the pixels with.
+ * @param {number} [start=0] - The starting index from where to start filling the pixels.
+ * @param {number} [length=pixels.length] - The number of pixels to fill with the color.
+ * @throws {Error} Will throw an error if an issue occurs during execution.
  */
 function fill(color, start = 0, length = pixels.length) {
-	if (length >= pixels.length) length = pixels.length;
+	try {
+		// If the length provided is greater than or equal to the length of the pixels array,
+		// set the length to the length of the pixels array to avoid out of bounds errors.
+		if (length >= pixels.length) length = pixels.length;
 
-	for (let i = 0; i < length; i++) {
-		pixels[i + start] = color;
+		// Loop through the specified portion of the pixels array
+		for (let i = 0; i < length; i++) {
+			// Set each pixel in the specified range to the provided color
+			pixels[i + start] = color;
+		}
+	} catch (err) {
+		// If an error occurs, re-throw it to be handled by the caller
+		throw err;
 	}
 }
 
@@ -60,12 +87,17 @@ function fill(color, start = 0, length = pixels.length) {
  *
  * @param {number} hex - The hexadecimal color value.
  * @returns {Array.<number>} The RGB color value as an array.
+ * @throws {Error} Will throw an error if an issue occurs during execution.
  */
 function hexToRgb(hex) {
-	// Shift the bits of the hex value to get the red, green, and blue values.
-	// The "& 255" operation is used to ensure we only get the last 8 bits (one byte) of the result.
-	// This is because each color component in an RGB value is represented by one byte.
-	return [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255];
+	try {
+		// Shift the bits of the hex value to get the red, green, and blue values.
+		// The "& 255" operation is used to ensure we only get the last 8 bits (one byte) of the result.
+		// This is because each color component in an RGB value is represented by one byte.
+		return [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255];
+	} catch (err) {
+		throw err
+	}
 }
 
 /**
@@ -78,6 +110,167 @@ function rgbToHex(rgb) {
 	// Shift the bits of the RGB values to get the hexadecimal color value.
 	// The "| (bitwise OR)" operation is used to combine the three color components into a single hexadecimal value.
 	return ((rgb[0] << 16) | (rgb[1] << 8) | rgb[2]);
+}
+
+/**
+ * This function safely parses a JSON string and returns the parsed object.
+ *
+ * @param {string} string - The JSON string to parse.
+ * @returns {object|string} - The parsed object or an error message.
+ * @throws {Error} - If an error other than invalid JSON string occurs.
+ */
+function safeJsonParse(string) {
+	try {
+		// Check if input is a string
+		if (typeof string !== 'string') return "Input must be a string";
+
+		// Parse the JSON string
+		let value = JSON.parse(string);
+
+		// Check if parsed value is an object
+		if (typeof value === 'object') return value;
+		else return "Parsed value is not an object";
+	} catch (err) {
+		// Check if error is due to invalid JSON
+		if (err.message.endsWith('is not valid JSON')) {
+			return "Input is not a valid JSON string";
+		} else throw err;  // Throw any other error
+	}
+}
+
+/**
+ * This function converts a color from text format to hexadecimal format.
+ *
+ * @param {string} color - The input can be a string representing a color in hexadecimal format or a JSON string representing a color in RGB format.
+ * @returns {number|string} - The color in hexadecimal format, or an error message if the input is not valid.
+ * @throws {Error} - If an error other than invalid input occurs.
+ */
+function textToHexColor(color) {
+	try {
+		// Check if the input is a string
+		if (typeof color != 'string') return "Input must be a string";
+
+		// Check if the color is in hexadecimal format
+		if (color.startsWith('#')) {
+			// Remove the '#' from the start of the color
+			color = color.slice(1);
+
+			// Check if the color is 6 characters long
+			if (color.length != 6) return "Hex color must be 6 characters long";
+
+			// Convert the color to a number and return it
+			return Number.parseInt(color, 16)
+		}
+
+		// Try to parse the color as a JSON string
+		color = safeJsonParse(color);
+
+		if (typeof color == 'string') return color;
+		if (color instanceof Error) throw color;
+
+		let red, green, blue;
+
+		// Get the keys of the color object
+		keys = Object.keys(color)
+
+		// Check if the keys are 'red', 'green', and 'blue'
+		if (keys.every(item => ['red', 'green', 'blue'].includes(item))) {
+			red = color.red
+			green = color.green
+			blue = color.blue
+			// Check if the keys are 'r', 'g', and 'b'
+		} else if (keys.every(item => ['r', 'g', 'b'].includes(item))) {
+			red = color.r
+			green = color.g
+			blue = color.b
+		} else return "Invalid color keys";
+
+		// Check if the color values are integers between 0 and 255
+		if ([red, green, blue].some(item =>
+			item < 0 || item > 255 || !Number.isInteger(item)
+		)) return "Color values must be integers between 0 and 255";
+
+		// Convert the color to hexadecimal format and return it
+		return rgbToHex([red, green, blue])
+	} catch (err) {
+		// Throw any other error that might occur
+		throw err
+	}
+}
+
+/**
+ * This function validates the pixel object and calculates its position on the board.
+ *
+ * @param {Object} pixel - The pixel object with 'x' and 'y' properties.
+ * @returns {number|string} The calculated pixel position or an error message if the pixel object is invalid.
+ * @throws {Error} If an unexpected error occurs during the validation and calculation process.
+ */
+function validateAndCalculatePixel(pixel) {
+	try {
+		// Check if pixel object has 'x' and 'y' properties
+		if (Object.keys(pixel).every(item => !['x', 'y'].includes(item))) return 'invalid pixel format';
+
+		// Extract 'x' and 'y' properties from pixel object
+		let x = pixel.x;
+		let y = pixel.y;
+
+		// Validate 'x' and 'y' properties
+		if (!x && x != 0) return 'no x';
+		if (!y && y != 0) return 'no y';
+		if (typeof x != 'number') return 'x not a number';
+		if (typeof y != 'number') return 'y not a number';
+		if (!Number.isInteger(x)) return 'x not an integer';
+		if (!Number.isInteger(y)) return 'y not an integer';
+		if (x < 0 || x >= BOARD_WIDTH * config.boards) return 'x out of bounds';
+		if (y < 0 || y >= BOARD_HEIGHT) return 'y out of bounds';
+
+		// Calculate pixel position on the board
+		pixel = config.barPixels;
+		pixel += x * BOARD_HEIGHT;
+
+		// Adjust pixel position based on 'x' property
+		if (x % 2 == 1) {
+			pixel += BOARD_HEIGHT - 1;
+			pixel -= y;
+		} else pixel += y;
+
+		// Return calculated pixel position
+		return pixel;
+	} catch (err) {
+		// Throw any unexpected error that might occur
+		throw err
+	}
+}
+
+/**
+ * This function parses the pixel input and returns the pixel number.
+ *
+ * @param {number|string|Object} pixel - The pixel input which can be a number, a string representing a number, a JSON string representing a pixel object, or a pixel object.
+ * @returns {number|string} - The pixel number or an error message if the input is a string that cannot be parsed or if the pixel object is invalid.
+ * @throws {Error} - If an unexpected error occurs during the parsing and validation process.
+ */
+function getPixelNumber(pixel) {
+	try {
+		// If pixel is a number or a string representing a number, return it as a number
+		if (Number(pixel)) {
+			return Number(pixel);
+		} else if (typeof pixel == 'string') {
+			// If pixel is a string, try to parse it as a JSON string
+			pixel = safeJsonParse(pixel);
+
+			// If parsing failed, return the error message
+			if (typeof pixel == 'string' || pixel instanceof Error) return pixel;
+
+			// If parsing succeeded, validate and calculate the pixel number
+			return validateAndCalculatePixel(pixel);
+		} else if (typeof pixel == 'object' && !Array.isArray(pixel)) {
+			// If pixel is an object (and not an array), validate and calculate the pixel number
+			return validateAndCalculatePixel(pixel);
+		}
+	} catch (err) {
+		// If an unexpected error occurs, throw it
+		throw err
+	}
 }
 
 /**
@@ -174,7 +367,8 @@ function displayBoard(string, textColor, backgroundColor, forced = false) {
 
 	currentText = string
 
-	clearInterval(textInterval);
+	clearInterval(textInterval)
+	textInterval = null;
 
 	// Convert each letter in the string to its pixel representation
 	for (let letter of string) {
@@ -213,23 +407,245 @@ function displayBoard(string, textColor, backgroundColor, forced = false) {
 }
 
 
-// clear pixels
-fill(0x000000)
-ws281x.render()
+// express api
+app.use((req, res, next) => {
+	if (!connected) {
+		res.json({ error: 'This formPix is not connected to a formBar' })
+		return
+	}
 
+	next()
+})
 
-// set web socket url
-const socket = io(config.ip, {
-	extraHeaders: {
-		api: config.api
+// Route to fill the bar with a color
+app.get('/fill', (req, res) => {
+	try {
+		// Extract color, start and length from the request query
+		let { color, start = 0, length = pixels.length } = req.query
+
+		// Convert color from text to hex
+		color = textToHexColor(color)
+
+		// If color is a string, send a 400 response with the color
+		if (typeof color == 'string') {
+			res.status(400).send(color)
+			return
+		}
+		// If color is an instance of Error, throw the error
+		if (color instanceof Error) throw color
+
+		// If start is not an integer, send a 400 response
+		if (isNaN(start) || !Number.isInteger(Number(start))) {
+			res.status(400).send('start must be an integer')
+			return
+		}
+		// If length is not an integer, send a 400 response
+		if (isNaN(length) || !Number.isInteger(Number(length))) {
+			res.status(400).send('length must be an integer')
+			return
+		}
+
+		// Convert start and length to numbers
+		start = Number(start)
+		length = Number(length)
+
+		// If the start and length exceed the bar pixels, clear the interval and fill the bar with black color
+		if (textInterval && start + length > config.barPixels) {
+			clearInterval(textInterval)
+			textInterval = null
+			fill(0x000000, config.barPixels)
+		}
+
+		// Fill the bar with the specified color from start position for the specified length
+		fill(color, start, length)
+
+		// Render the changes
+		ws281x.render()
+		// Send a 200 response with 'ok'
+		res.status(200).send('ok')
+	} catch (err) {
+		// If an error occurs, send a 500 response with 'error'
+		res.status(500).send('error')
 	}
 })
 
+// Route to set a specific pixel with a color
+app.get('/setPixel', (req, res) => {
+	try {
+		// Extract pixel and color from the request query
+		let { pixel, color } = req.query
 
+		// Convert color from text to hex
+		color = textToHexColor(color)
+
+		// If color is a string or an instance of Error, handle it accordingly
+		if (typeof color == 'string') {
+			res.status(400).send(color)
+			return
+		}
+		if (color instanceof Error) throw color
+
+		// Convert pixel to pixel number
+		let pixelNumber = getPixelNumber(pixel)
+
+		// If pixelNumber is a string or an instance of Error, handle it accordingly
+		if (typeof pixelNumber == 'string') {
+			res.status(400).send(pixelNumber)
+			return
+		}
+		if (pixelNumber instanceof Error) throw pixelNumber
+
+		// If textInterval exists and pixelNumber is greater than or equal to the number of bar pixels, clear the interval and fill the bar with black color
+		if (textInterval && pixelNumber >= config.barPixels) {
+			clearInterval(textInterval);
+			textInterval = null;
+			fill(0x000000, config.barPixels);
+		}
+
+		// Set the specified pixel with the specified color
+		pixels[pixelNumber] = color
+		// Render the changes
+		ws281x.render()
+		// Send a 200 response with 'ok'
+		res.status(200).send('ok')
+	} catch (err) {
+		// If an error occurs, send a 500 response with 'error'
+		res.status(500).send('error')
+	}
+})
+
+// Route to set multiple pixels with colors
+app.get('/setPixels', (req, res) => {
+	try {
+		// Extract pixels from the request query
+		let inputPixels = req.query.pixels
+		// Clone the current pixels array
+		let tempPixels = structuredClone(pixels)
+
+		// Flag to check if the board has been changed
+		let changedBoard = false
+
+		// Safely parse the input pixels
+		inputPixels = safeJsonParse(inputPixels)
+
+		// If inputPixels is a string or an instance of Error, handle it accordingly
+		if (typeof inputPixels == 'string') {
+			res.status(400).send(inputPixels)
+			return
+		}
+		if (inputPixels instanceof Error) throw inputPixels
+
+		// Iterate over each input pixel
+		for (let inputPixel of inputPixels) {
+			// Convert color from text to hex
+			let color = textToHexColor(inputPixel.color)
+			let pixelNumber
+
+			// If color is a string or an instance of Error, handle it accordingly
+			if (typeof color == 'string') {
+				res.status(400).send(color)
+				return
+			}
+			if (color instanceof Error) throw color
+
+			// Get the pixel number from the input pixel's pixelNumber or x and y coordinates
+			console.log(inputPixel);
+			if (inputPixel.pixelNumber || inputPixel.pixelNumber == 0) pixelNumber = inputPixel.pixelNumber
+			else pixelNumber = getPixelNumber({ x: inputPixel.x, y: inputPixel.y })
+
+			// If pixelNumber is a string or an instance of Error, handle it accordingly
+			if (typeof pixelNumber == 'string') {
+				res.status(400).send(pixelNumber)
+				return
+			}
+			if (pixelNumber instanceof Error) throw pixelNumber
+
+			// If textInterval exists and pixelNumber is greater than or equal to the number of bar pixels, clear the pixels on the board
+			if (textInterval && pixelNumber >= config.barPixels && !changedBoard) {
+				changedBoard = true
+
+				for (let i = config.barPixels; i < tempPixels.length; i++) {
+					tempPixels[i] = 0x000000
+				}
+			}
+
+			// Set the specified pixel with the specified color
+			tempPixels[pixelNumber] = color
+		}
+
+		// If the board has been changed, clear the text interval
+		if (changedBoard) {
+			clearInterval(textInterval);
+			textInterval = null;
+		}
+
+		// Set the pixels array with the tempPixels array
+		pixels.set(tempPixels)
+
+		// Render the changes
+		ws281x.render()
+
+		// Send a 200 response with the input pixels, temp pixels, and whether the board has been changed
+		res.status(200).json({ inputPixels, tempPixels, changedBoard })
+	} catch (err) {
+		// If an error occurs, log the error and send a 500 response with 'error'
+		res.status(500).send('error')
+	}
+})
+
+// Route to display a string with a specified text color and background color
+app.get('/say', (req, res) => {
+	try {
+		// Extract string, textColor and backgroundColor from the request query
+		let { string, textColor, backgroundColor } = req.query
+
+		// If string, textColor or backgroundColor is not provided, send a response indicating the missing parameter
+		if (!string) {
+			res.send('no string')
+			return
+		}
+		if (!textColor) {
+			res.send('no textColor')
+			return
+		}
+		if (!backgroundColor) {
+			res.send('no backgroundColor')
+			return
+		}
+
+		// Convert textColor and backgroundColor from text to hex
+		textColor = textToHexColor(textColor)
+		backgroundColor = textToHexColor(backgroundColor)
+
+		// If textColor or backgroundColor is a string or an instance of Error, send a 400 response with the problematic color
+		if (typeof textColor == 'string') {
+			res.status(400).send(textColor)
+			return
+		}
+		if (textColor instanceof Error) throw textColor
+		if (typeof backgroundColor == 'string') {
+			res.status(400).send(backgroundColor)
+			return
+		}
+		if (backgroundColor instanceof Error) throw backgroundColor
+
+		// Call the displayBoard function with the string, textColor, and backgroundColor to display the string with the specified colors
+		displayBoard(string, textColor, backgroundColor)
+		// Send a 200 response with 'ok' to indicate successful operation
+		res.status(200).send('ok')
+	} catch (err) {
+		// If an error occurs, send a 500 response with 'error'
+		res.status(500).send('error')
+	}
+})
+
+// sockets
 // when there is a connection error it tys to reconnect
 socket.on('connect_error', (error) => {
 	if (error.message == 'xhr poll error') console.log('no connection');
 	else console.log(error.message);
+
+	connected = false
 
 	fill(0x000000)
 	ws281x.render()
@@ -242,6 +658,9 @@ socket.on('connect_error', (error) => {
 // when it connects to formBar it ask for the bars data
 socket.on('connect', () => {
 	console.log('connected')
+
+	connected = true
+
 	displayBoard(config.ip.split('://')[1], 0xFFFFFF, 0x000000, true)
 	player.play('./sfx/sfx_bootup02.wav')
 })
@@ -394,4 +813,8 @@ socket.on('kickStudentsSound', () => {
 
 socket.on('endClassSound', () => {
 	player.play('./sfx/sfx_explode01.wav')
+})
+
+httpServer.listen(config.port, async () => {
+	console.log(`Running on port: ${config.port}`)
 })
