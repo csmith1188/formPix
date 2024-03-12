@@ -352,55 +352,76 @@ function showString(boardPixels, start, textColor, backgroundColor) {
 	}
 }
 
+
 /**
- * Displays a string on the board with specified text and background colors.
+ * Display a string on a LED board.
  *
  * @param {string} string - The string to display.
  * @param {string} textColor - The color of the text.
  * @param {string} backgroundColor - The color of the background.
+ * @param {boolean} [forced=false] - Force the display of the string even if it's the same as the current one.
  */
 function displayBoard(string, textColor, backgroundColor, forced = false) {
+	// Convert the string to lowercase
 	string = string.toLowerCase();
+
+	// Initialize the board pixels with an empty row
 	let boardPixels = [Array(8).fill(0)];
 
+	// If the current text is the same as the input string and the display is not forced, return
 	if (currentText == string && !forced) return
 
+	// Set the current text to the input string
 	currentText = string
 
+	// Clear any existing text display interval
 	clearInterval(textInterval)
 	textInterval = null;
 
-	// Convert each letter in the string to its pixel representation
+	// For each letter in the string
 	for (let letter of string) {
+		// If the letter is not in the letters object, skip it
 		if (!letters[letter]) continue
+
+		// Get a copy of the letter image
 		let letterImage = letters[letter].map(arr => arr.slice());
 
-		// Add the letter's pixels to the board
+		// Add the letter image to the board pixels
 		for (let col of letterImage) {
 			boardPixels.push(col);
 		}
 
-		// Add a column of blank pixels after each letter
+		// Add an empty row after the letter
 		boardPixels.push(Array(8).fill(0));
 	}
 
-	// If the board is wide enough to display the entire string at once
+	// If the board pixels fit on the board
 	if (boardPixels.length <= config.boards * BOARD_WIDTH) {
+		// Show the string on the board
 		showString(boardPixels, 0, textColor, backgroundColor);
+
+		// Render the board
 		ws281x.render();
 	} else {
+		// If the board pixels don't fit on the board
+
+		// Add a space to the end of the board pixels
 		for (let col of letters[' '].map(arr => arr.slice())) {
 			boardPixels.push(col);
 		}
-		// Otherwise, scroll the string across the board
+
+		// Initialize the start column
 		let startColumn = 0;
 
+		// Start an interval to scroll the string on the board
 		textInterval = setInterval(() => {
+			// Show the string on the board starting from the start column
 			showString(boardPixels, startColumn, textColor, backgroundColor);
 
-			// Move to the next column, wrapping around if necessary
+			// Move the start column to the right, wrapping around to the start if necessary
 			startColumn = (startColumn + 1) % boardPixels.length;
 
+			// Render the board
 			ws281x.render();
 		}, 250);
 	}
@@ -408,63 +429,61 @@ function displayBoard(string, textColor, backgroundColor, forced = false) {
 
 
 // express api
+/**
+ * Middleware function to check if the application is connected to a formBar.
+ *
+ * @param {object} req - The request object.
+ * @param {object} res - The response object.
+ * @param {function} next - The next middleware function.
+ */
 app.use((req, res, next) => {
+	// If the application is not connected to a formBar
 	if (!connected) {
+		// Respond with an error message
 		res.json({ error: 'This formPix is not connected to a formBar' })
+		// End the request-response cycle
 		return
 	}
 
+	// If the application is connected to a formBar, proceed to the next middleware function
 	next()
 })
 
-// Route to fill the bar with a color
 app.get('/fill', (req, res) => {
 	try {
-		// Extract color, start and length from the request query
 		let { color, start = 0, length = pixels.length } = req.query
 
-		// Convert color from text to hex
 		color = textToHexColor(color)
 
-		// If color is a string, send a 400 response with the color
 		if (typeof color == 'string') {
 			res.status(400).send(color)
 			return
 		}
-		// If color is an instance of Error, throw the error
 		if (color instanceof Error) throw color
 
-		// If start is not an integer, send a 400 response
 		if (isNaN(start) || !Number.isInteger(Number(start))) {
 			res.status(400).send('start must be an integer')
 			return
 		}
-		// If length is not an integer, send a 400 response
 		if (isNaN(length) || !Number.isInteger(Number(length))) {
 			res.status(400).send('length must be an integer')
 			return
 		}
 
-		// Convert start and length to numbers
 		start = Number(start)
 		length = Number(length)
 
-		// If the start and length exceed the bar pixels, clear the interval and fill the bar with black color
 		if (textInterval && start + length > config.barPixels) {
 			clearInterval(textInterval)
 			textInterval = null
 			fill(0x000000, config.barPixels)
 		}
 
-		// Fill the bar with the specified color from start position for the specified length
 		fill(color, start, length)
 
-		// Render the changes
 		ws281x.render()
-		// Send a 200 response with 'ok'
 		res.status(200).send('ok')
 	} catch (err) {
-		// If an error occurs, send a 500 response with 'error'
 		res.status(500).send('error')
 	}
 })
