@@ -449,18 +449,25 @@ app.use((req, res, next) => {
 	next()
 })
 
+// Define a route for '/fill' endpoint
 app.get('/fill', (req, res) => {
 	try {
+		// Destructure color, start, and length from the request query
+		// If start and length are not provided, default values are set
 		let { color, start = 0, length = pixels.length } = req.query
 
+		// Convert the color text to hexadecimal color
 		color = textToHexColor(color)
 
+		// If color is a string, send a 400 status code with color as the response
 		if (typeof color == 'string') {
 			res.status(400).send(color)
 			return
 		}
+		// If color is an instance of Error, throw the error
 		if (color instanceof Error) throw color
 
+		// Validate start and length to be integers, if not send a 400 status code with an error message
 		if (isNaN(start) || !Number.isInteger(Number(start))) {
 			res.status(400).send('start must be an integer')
 			return
@@ -470,20 +477,26 @@ app.get('/fill', (req, res) => {
 			return
 		}
 
+		// Convert start and length to numbers
 		start = Number(start)
 		length = Number(length)
 
+		// If textInterval exists and start + length is greater than the total bar pixels, clear the interval and fill the bar with black color
 		if (textInterval && start + length > config.barPixels) {
 			clearInterval(textInterval)
 			textInterval = null
 			fill(0x000000, config.barPixels)
 		}
 
+		// Fill the bar with the specified color, start, and length
 		fill(color, start, length)
 
+		// Render the changes
 		ws281x.render()
+		// Send a 200 status code with 'ok' as the response
 		res.status(200).send('ok')
 	} catch (err) {
+		// If any error occurs, send a 500 status code with 'error' as the response
 		res.status(500).send('error')
 	}
 })
@@ -659,50 +672,69 @@ app.get('/say', (req, res) => {
 })
 
 // sockets
-// when there is a connection error it tys to reconnect
+// Listen for 'connect_error' event on the socket
 socket.on('connect_error', (error) => {
+	// If the error message is 'xhr poll error', log 'no connection' to the console
 	if (error.message == 'xhr poll error') console.log('no connection');
+	// Otherwise, log the error message to the console
 	else console.log(error.message);
 
+	// Set the connected flag to false
 	connected = false
 
+	// Fill the bar with black color
 	fill(0x000000)
+	// Render the changes
 	ws281x.render()
 
+	// After 5 seconds, try to connect again
 	setTimeout(() => {
 		socket.connect()
 	}, 5000)
 })
 
-// when it connects to formBar it ask for the bars data
+// Listen for 'connect' event on the socket
 socket.on('connect', () => {
+	// Log 'connected' to the console
 	console.log('connected')
 
+	// Set the connected flag to true
 	connected = true
 
+	// Display the board with the IP address, white color, black background, and true for the clear flag
 	displayBoard(config.ip.split('://')[1], 0xFFFFFF, 0x000000, true)
+
+	// Play the bootup sound effect
 	player.play('./sfx/sfx_bootup02.wav')
 })
 
+// Listen for 'setClass' event from the socket
 socket.on('setClass', (userClass) => {
+	// If the userClass is 'noClass'
 	if (userClass == 'noClass') {
+		// Set classCode to an empty string
 		classCode = ''
+		// Set the fill color to black
 		fill(0x000000)
+		// Display the board with the specified parameters
 		displayBoard(config.ip.split('://')[1], 0xFFFFFF, 0x000000, true)
+		// Render the changes
 		ws281x.render()
 	} else {
+		// If the userClass is not 'noClass', set classCode to userClass
 		classCode = userClass
+		// Emit 'vbUpdate' event to the socket
 		socket.emit('vbUpdate')
 	}
 })
 
-// when the bar changes
+// Listen for 'vbUpdate' event from the socket
 socket.on('vbUpdate', (newPollData) => {
 	let pixelsPerStudent
 	let text = ''
 	let pollResponses = 0
 
-	// if no poll clear pixels
+	// If the poll status is false, clear the display and return
 	if (!newPollData.status) {
 		displayBoard(config.ip.split('://')[1], 0xFFFFFF, 0x000000)
 		ws281x.render()
@@ -710,26 +742,28 @@ socket.on('vbUpdate', (newPollData) => {
 		return
 	}
 
+	// Set the initial fill color
 	fill(0x808080, 0, config.barPixels)
 
-	// convert colors from hex to integers
+	// Convert colors from hex to integers for each poll
 	for (let poll of Object.values(newPollData.polls)) {
 		poll.color = parseInt(poll.color.slice(1), 16)
 	}
 
-
-	// count poll responses
+	// Count total poll responses
 	for (let poll of Object.values(newPollData.polls)) {
 		pollResponses += poll.responses
 	}
 
-	// if totalStudents = pollResponses turn off blind mode
+	// If total students equals poll responses, disable blind mode
 	if (newPollData.totalStudents == pollResponses) {
 		newPollData.blind = false
 	}
 
+	// If new poll data is the same as the old, return
 	if (util.isDeepStrictEqual(newPollData, pollData)) return
 
+	// If total students equals poll responses, play specific sounds and display messages based on the prompt
 	if (newPollData.totalStudents == pollResponses) {
 		if (newPollData.prompt == 'Thumbs?') {
 			if (newPollData.polls.Up.responses == newPollData.totalStudents) {
@@ -747,14 +781,13 @@ socket.on('vbUpdate', (newPollData) => {
 		}
 	}
 
+	// Set the display text based on the prompt and poll responses
 	if (newPollData.prompt) text += newPollData.prompt
 	else text += 'Poll'
-
 	text += ` ${pollResponses}/${newPollData.totalStudents}`
-
 	displayBoard(text, 0xFFFFFF, 0x000000)
 
-	// count non-empty polls
+	// Count non-empty polls
 	let nonEmptyPolls = -1
 	for (let poll of Object.values(newPollData.polls)) {
 		if (poll.responses > 0) {
@@ -762,25 +795,24 @@ socket.on('vbUpdate', (newPollData) => {
 		}
 	}
 
+	// Calculate pixels per student, considering non-empty polls
 	if (newPollData.totalStudents <= 0) pixelsPerStudent = 0
-	else pixelsPerStudent = Math.floor((config.barPixels - nonEmptyPolls) / newPollData.totalStudents) //- nonEmptyPolls
+	else pixelsPerStudent = Math.floor((config.barPixels - nonEmptyPolls) / newPollData.totalStudents)
 
-	// add polls
+	// Add polls to the display
 	let currentPixel = 0
 	let pollNumber = 0
-
 	for (let [name, poll] of Object.entries(newPollData.polls)) {
-		// for each response
+		// For each response
 		for (let responseNumber = 0; responseNumber < poll.responses; responseNumber++) {
 			let color = poll.color
 			if (newPollData.blind) color = 0xFF8000
 
-			// set response to color
+			// Set response to color
 			fill(color, currentPixel, pixelsPerStudent)
-
 			currentPixel += pixelsPerStudent
 
-			// set spacers
+			// Set spacers
 			if (
 				responseNumber < poll.responses - 1 ||
 				pollNumber < nonEmptyPolls
@@ -790,6 +822,7 @@ socket.on('vbUpdate', (newPollData) => {
 			}
 		}
 
+		// If not in blind mode and there are responses, increment current pixel
 		if (
 			!newPollData.blind &&
 			poll.responses > 0
@@ -797,43 +830,63 @@ socket.on('vbUpdate', (newPollData) => {
 		pollNumber++
 	}
 
+	// Update poll data
 	pollData = newPollData
 
+	// Render the changes
 	ws281x.render()
 })
 
+// Listen for 'helpSound' event from the socket
 socket.on('helpSound', () => {
+	// Play the sound file located at './sfx/sfx_up04.wav'
 	player.play('./sfx/sfx_up04.wav')
 })
 
+// Listen for 'breakSound' event from the socket
 socket.on('breakSound', () => {
+	// Play the sound file located at './sfx/sfx_pickup02.wav'
 	player.play('./sfx/sfx_pickup02.wav')
 })
 
+// Listen for 'pollSound' event from the socket
 socket.on('pollSound', () => {
+	// Play the sound file located at './sfx/sfx_blip01.wav'
 	player.play('./sfx/sfx_blip01.wav')
 })
 
+// Listen for 'removePollSound' event from the socket
 socket.on('removePollSound', () => {
+	// Play the sound file located at './sfx/sfx_hit01.wav'
 	player.play('./sfx/sfx_hit01.wav')
 })
 
+// Listen for 'joinSound' event from the socket
 socket.on('joinSound', () => {
+	// Play the sound file located at './sfx/sfx_up02.wav'
 	player.play('./sfx/sfx_up02.wav')
 })
 
+// Listen for 'leaveSound' event from the socket
 socket.on('leaveSound', () => {
+	// Play the sound file located at './sfx/sfx_laser01.wav'
 	player.play('./sfx/sfx_laser01.wav')
 })
 
+// Listen for 'kickStudentsSound' event from the socket
 socket.on('kickStudentsSound', () => {
+	// Play the sound file located at './sfx/sfx_splash01.wav'
 	player.play('./sfx/sfx_splash01.wav')
 })
 
+// Listen for 'endClassSound' event from the socket
 socket.on('endClassSound', () => {
+	// Play the sound file located at './sfx/sfx_explode01.wav'
 	player.play('./sfx/sfx_explode01.wav')
 })
 
+// Start the HTTP server and listen on the port specified in the configuration
 httpServer.listen(config.port, async () => {
-	console.log(`Running on port: ${config.port}`)
+	// Log a message to the console indicating the port number the server is running on
+	console.log(`Server is up and running on port: ${config.port}`)
 })
