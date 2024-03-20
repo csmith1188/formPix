@@ -132,7 +132,7 @@ function safeJsonParse(string) {
 		else return "Parsed value is not an object";
 	} catch (err) {
 		// Check if error is due to invalid JSON
-		if (err.message.endsWith('is not valid JSON')) {
+		if (err.message.toLowerCase().includes('json')) {
 			return "Input is not a valid JSON string";
 		} else throw err;  // Throw any other error
 	}
@@ -252,8 +252,9 @@ function validateAndCalculatePixel(pixel) {
 function getPixelNumber(pixel) {
 	try {
 		// If pixel is a number or a string representing a number, return it as a number
-		if (Number(pixel)) {
-			return Number(pixel);
+		if (!isNaN(pixel)) {
+			if (typeof pixel == 'number') return pixel;
+			else return Number(pixel);
 		} else if (typeof pixel == 'string') {
 			// If pixel is a string, try to parse it as a JSON string
 			pixel = safeJsonParse(pixel);
@@ -429,13 +430,7 @@ function displayBoard(string, textColor, backgroundColor, forced = false) {
 
 
 // express api
-/**
- * Middleware function to check if the application is connected to a formBar.
- *
- * @param {object} req - The request object.
- * @param {object} res - The response object.
- * @param {function} next - The next middleware function.
- */
+// check connection
 app.use((req, res, next) => {
 	// If the application is not connected to a formBar
 	if (!connected) {
@@ -449,8 +444,19 @@ app.use((req, res, next) => {
 	next()
 })
 
-// Define a route for '/fill' endpoint
-app.get('/fill', (req, res) => {
+app.use((req, res, next) => {
+	let apiKey = req.headers.api
+
+	if (!apiKey) {
+		res.status(400).json({ error: 'Missing API key' })
+		return
+	}
+
+	next()
+})
+
+// Route to fill the bar with a color
+app.get('/api/fill', (req, res) => {
 	try {
 		// Destructure color, start, and length from the request query
 		// If start and length are not provided, default values are set
@@ -502,7 +508,7 @@ app.get('/fill', (req, res) => {
 })
 
 // Route to set a specific pixel with a color
-app.get('/setPixel', (req, res) => {
+app.get('/api/setPixel', (req, res) => {
 	try {
 		// Extract pixel and color from the request query
 		let { pixel, color } = req.query
@@ -536,8 +542,10 @@ app.get('/setPixel', (req, res) => {
 
 		// Set the specified pixel with the specified color
 		pixels[pixelNumber] = color
+
 		// Render the changes
 		ws281x.render()
+
 		// Send a 200 response with 'ok'
 		res.status(200).send('ok')
 	} catch (err) {
@@ -547,7 +555,7 @@ app.get('/setPixel', (req, res) => {
 })
 
 // Route to set multiple pixels with colors
-app.get('/setPixels', (req, res) => {
+app.get('/api/setPixels', (req, res) => {
 	try {
 		// Extract pixels from the request query
 		let inputPixels = req.query.pixels
@@ -556,6 +564,12 @@ app.get('/setPixels', (req, res) => {
 
 		// Flag to check if the board has been changed
 		let changedBoard = false
+
+		// If inputPixels is not provided, send a 400 response
+		if (!inputPixels) {
+			res.status(400).send({ error: 'You did not provide any pixels' })
+			return
+		}
 
 		// Safely parse the input pixels
 		inputPixels = safeJsonParse(inputPixels)
@@ -580,10 +594,7 @@ app.get('/setPixels', (req, res) => {
 			}
 			if (color instanceof Error) throw color
 
-			// Get the pixel number from the input pixel's pixelNumber or x and y coordinates
-			console.log(inputPixel);
-			if (inputPixel.pixelNumber || inputPixel.pixelNumber == 0) pixelNumber = inputPixel.pixelNumber
-			else pixelNumber = getPixelNumber({ x: inputPixel.x, y: inputPixel.y })
+			pixelNumber = getPixelNumber(inputPixel.pixelNumber)
 
 			// If pixelNumber is a string or an instance of Error, handle it accordingly
 			if (typeof pixelNumber == 'string') {
@@ -617,23 +628,23 @@ app.get('/setPixels', (req, res) => {
 		// Render the changes
 		ws281x.render()
 
-		// Send a 200 response with the input pixels, temp pixels, and whether the board has been changed
-		res.status(200).json({ inputPixels, tempPixels, changedBoard })
+		// Send a 200 response with 'ok'
+		res.status(200).send('ok')
 	} catch (err) {
-		// If an error occurs, log the error and send a 500 response with 'error'
+		// If an error occurs, send a 500 response with 'error'
 		res.status(500).send('error')
 	}
 })
 
-// Route to display a string with a specified text color and background color
-app.get('/say', (req, res) => {
+// Route to display a text with a specified text color and background color
+app.get('/api/say', (req, res) => {
 	try {
-		// Extract string, textColor and backgroundColor from the request query
-		let { string, textColor, backgroundColor } = req.query
+		// Extract text, textColor and backgroundColor from the request query
+		let { text, textColor, backgroundColor } = req.query
 
-		// If string, textColor or backgroundColor is not provided, send a response indicating the missing parameter
-		if (!string) {
-			res.send('no string')
+		// If text, textColor or backgroundColor is not provided, send a response indicating the missing parameter
+		if (!text) {
+			res.send('no text')
 			return
 		}
 		if (!textColor) {
@@ -661,12 +672,33 @@ app.get('/say', (req, res) => {
 		}
 		if (backgroundColor instanceof Error) throw backgroundColor
 
-		// Call the displayBoard function with the string, textColor, and backgroundColor to display the string with the specified colors
-		displayBoard(string, textColor, backgroundColor)
+		// Call the displayBoard function with the text, textColor, and backgroundColor to display the text with the specified colors
+		displayBoard(text, textColor, backgroundColor)
 		// Send a 200 response with 'ok' to indicate successful operation
 		res.status(200).send('ok')
 	} catch (err) {
 		// If an error occurs, send a 500 response with 'error'
+		res.status(500).send('error')
+	}
+})
+
+
+// 404 Error
+app.use((req, res, next) => {
+	try {
+		// Defines users desired endpoint
+		let urlPath = req.url
+		// Checks if url has a / in it and removes it from the string
+		if (urlPath.indexOf('/') != -1) {
+			urlPath = urlPath.slice(urlPath.indexOf('/') + 1)
+		}
+		// Check for ?(urlParams) and removes it from the string
+		if (urlPath.indexOf('?') != -1) {
+			urlPath = urlPath.slice(0, urlPath.indexOf('?'))
+		}
+
+		res.status(404).json({ error: `The page ${urlPath} does not exist` })
+	} catch (err) {
 		res.status(500).send('error')
 	}
 })
