@@ -508,7 +508,10 @@ app.use(async (req, res, next) => {
 app.use((req, res, next) => {
 	let query = req.query
 
+	console.log(query);
+
 	for (let key in query) {
+		console.log(key, query[key]);
 		if (Array.isArray(query[key])) {
 			res.status(400).json({ error: `You can only have one ${key} parameter` })
 			return
@@ -562,6 +565,70 @@ app.get('/api/fill', (req, res) => {
 
 		// Fill the bar with the specified color, start, and length
 		fill(color, start, length)
+
+		// Render the changes
+		ws281x.render()
+		// Send a 200 status code with 'ok' as the response
+		res.status(200).send('ok')
+	} catch (err) {
+		// If any error occurs, send a 500 status code with 'error' as the response
+		res.status(500).json({ error: 'There was a server error try again' })
+	}
+})
+
+// Route to fill a gradient on the bar with a color
+app.get('/api/gradient', (req, res) => {
+	try {
+		// Destructure color, start, and length from the request query
+		// If start and length are not provided, default values are set
+		let { startColor, endColor, start = 0, length = pixels.length } = req.query
+
+		// Convert the startColor text to hexadecimal color
+		startColor = textToHexColor(startColor)
+
+		// If startColor is a string, send a 400 status code with color as the response
+		if (typeof startColor == 'string') {
+			res.status(400).json({ error: startColor })
+			return
+		}
+		// If startColor is an instance of Error, throw the startColor
+		if (startColor instanceof Error) throw startColor
+
+		// Convert the endColor text to hexadecimal color
+		endColor = textToHexColor(endColor)
+
+		// If endColor is a string, send a 400 status code with color as the response
+		if (typeof endColor == 'string') {
+			res.status(400).json({ error: endColor })
+			return
+		}
+		// If endColor is an instance of Error, throw the endColor
+		if (endColor instanceof Error) throw endColor
+
+		// Check if is an not integer
+		if (isNaN(start) || !Number.isInteger(Number(start))) {
+			res.status(400).json({ error: 'start must be an integer' })
+			return
+		}
+		// Check if is an not integer
+		if (isNaN(length) || !Number.isInteger(Number(length))) {
+			res.status(400).json({ error: 'length must be an integer' })
+			return
+		}
+
+		// Convert start and length to numbers
+		start = Number(start)
+		length = Number(length)
+
+		// If textInterval exists and start + length is greater than the total bar pixels, clear the interval and fill the bar with black color
+		if (textInterval && start + length > config.barPixels) {
+			clearInterval(textInterval)
+			textInterval = null
+			fill(0x000000, config.barPixels)
+		}
+
+		// Fill the bar with the specified startColor, start, and length
+		gradient(startColor, endColor, start, length)
 
 		// Render the changes
 		ws281x.render()
