@@ -11,6 +11,13 @@ const player = require('play-sound')({ player: 'omxplayer' })
 // Constants
 const BOARD_WIDTH = 32
 const BOARD_HEIGHT = 8
+const END_POINT_PERMISSIONS = {
+	'/api/fill': 'lights',
+	'/api/gradient': 'lights',
+	'/api/setPixel': 'lights',
+	'/api/setPixels': 'lights',
+	'/api/say': 'lights'
+}
 
 
 // Config
@@ -49,7 +56,7 @@ ws281x.render()
 const app = express()
 const httpServer = http.createServer(app)
 
-const socket = io(config.ip, {
+const socket = io(config.formbarUrl, {
 	extraHeaders: {
 		api: config.api
 	}
@@ -260,7 +267,8 @@ function getPixelNumber(pixel) {
 			pixel = safeJsonParse(pixel);
 
 			// If parsing failed, return the error message
-			if (typeof pixel == 'string' || pixel instanceof Error) return pixel;
+			if (typeof pixel == 'string') return pixel
+			if (pixel instanceof Error) throw pixel
 
 			// If parsing succeeded, validate and calculate the pixel number
 			return validateAndCalculatePixel(pixel);
@@ -444,15 +452,56 @@ app.use((req, res, next) => {
 	next()
 })
 
-app.use((req, res, next) => {
-	let apiKey = req.headers.api
+// permissions check
+app.use(async (req, res, next) => {
+	try {
+		let apiKey = req.headers.api
 
-	if (!apiKey) {
-		res.status(400).json({ error: 'Missing API key' })
+		if (!req.url) {
+			res.status(400).json({ error: 'Missing URL' })
+			return
+		}
+
+		// Defines users desired endpoint
+		let urlPath = req.url
+
+		// Check for ?(urlParams) and removes it from the string
+		if (urlPath.indexOf('?') != -1) {
+			urlPath = urlPath.slice(0, urlPath.indexOf('?'))
+		}
+		// Removes the last / if it exists
+		if (urlPath[urlPath.length - 1] == '/') {
+			urlPath = urlPath.slice(0, urlPath.length - 1)
+		}
+
+		if (!apiKey) {
+			res.status(400).json({ error: 'Missing API key' })
+			return
+		}
+
+		if (!END_POINT_PERMISSIONS[urlPath]) {
+			res.status(404).json({ error: 'Endpoint does not exist in the permissions' })
+			return
+		}
+
+		let response = await fetch(`${config.formbarUrl}api/apiPermissionCheck?api=${apiKey}&permissionType=${END_POINT_PERMISSIONS[urlPath]}`, {
+			method: 'GET',
+			headers: {
+				api: config.api
+			}
+		})
+		data = await response.json();
+
+		if (data.error) {
+			res.status(response.status).json({ error: data.error })
+			return
+		}
+
+		next()
+	} catch (err) {
+		res.status(500).json({ error: 'There was a server error try again' })
 		return
 	}
-
-	next()
 })
 
 // Route to fill the bar with a color
@@ -467,7 +516,7 @@ app.get('/api/fill', (req, res) => {
 
 		// If color is a string, send a 400 status code with color as the response
 		if (typeof color == 'string') {
-			res.status(400).send(color)
+			res.status(400).json({ error: color })
 			return
 		}
 		// If color is an instance of Error, throw the error
@@ -475,11 +524,11 @@ app.get('/api/fill', (req, res) => {
 
 		// Validate start and length to be integers, if not send a 400 status code with an error message
 		if (isNaN(start) || !Number.isInteger(Number(start))) {
-			res.status(400).send('start must be an integer')
+			res.status(400).json({ error: 'start must be an integer' })
 			return
 		}
 		if (isNaN(length) || !Number.isInteger(Number(length))) {
-			res.status(400).send('length must be an integer')
+			res.status(400).json({ error: 'length must be an integer' })
 			return
 		}
 
@@ -503,7 +552,7 @@ app.get('/api/fill', (req, res) => {
 		res.status(200).send('ok')
 	} catch (err) {
 		// If any error occurs, send a 500 status code with 'error' as the response
-		res.status(500).send('error')
+		res.status(500).json({ error: 'There was a server error try again' })
 	}
 })
 
@@ -518,7 +567,7 @@ app.get('/api/setPixel', (req, res) => {
 
 		// If color is a string or an instance of Error, handle it accordingly
 		if (typeof color == 'string') {
-			res.status(400).send(color)
+			res.status(400).json({ error: color })
 			return
 		}
 		if (color instanceof Error) throw color
@@ -528,7 +577,7 @@ app.get('/api/setPixel', (req, res) => {
 
 		// If pixelNumber is a string or an instance of Error, handle it accordingly
 		if (typeof pixelNumber == 'string') {
-			res.status(400).send(pixelNumber)
+			res.status(400).json({ error: pixelNumber })
 			return
 		}
 		if (pixelNumber instanceof Error) throw pixelNumber
@@ -550,7 +599,7 @@ app.get('/api/setPixel', (req, res) => {
 		res.status(200).send('ok')
 	} catch (err) {
 		// If an error occurs, send a 500 response with 'error'
-		res.status(500).send('error')
+		res.status(500).json({ error: 'There was a server error try again' })
 	}
 })
 
@@ -567,7 +616,7 @@ app.get('/api/setPixels', (req, res) => {
 
 		// If inputPixels is not provided, send a 400 response
 		if (!inputPixels) {
-			res.status(400).send({ error: 'You did not provide any pixels' })
+			res.status(400).json({ error: 'You did not provide any pixels' })
 			return
 		}
 
@@ -576,7 +625,7 @@ app.get('/api/setPixels', (req, res) => {
 
 		// If inputPixels is a string or an instance of Error, handle it accordingly
 		if (typeof inputPixels == 'string') {
-			res.status(400).send(inputPixels)
+			res.status(400).json({ error: inputPixels })
 			return
 		}
 		if (inputPixels instanceof Error) throw inputPixels
@@ -589,7 +638,7 @@ app.get('/api/setPixels', (req, res) => {
 
 			// If color is a string or an instance of Error, handle it accordingly
 			if (typeof color == 'string') {
-				res.status(400).send(color)
+				res.status(400).json({ error: color })
 				return
 			}
 			if (color instanceof Error) throw color
@@ -598,7 +647,7 @@ app.get('/api/setPixels', (req, res) => {
 
 			// If pixelNumber is a string or an instance of Error, handle it accordingly
 			if (typeof pixelNumber == 'string') {
-				res.status(400).send(pixelNumber)
+				res.status(400).json({ error: pixelNumber })
 				return
 			}
 			if (pixelNumber instanceof Error) throw pixelNumber
@@ -632,7 +681,7 @@ app.get('/api/setPixels', (req, res) => {
 		res.status(200).send('ok')
 	} catch (err) {
 		// If an error occurs, send a 500 response with 'error'
-		res.status(500).send('error')
+		res.status(500).json({ error: 'There was a server error try again' })
 	}
 })
 
@@ -644,15 +693,15 @@ app.get('/api/say', (req, res) => {
 
 		// If text, textColor or backgroundColor is not provided, send a response indicating the missing parameter
 		if (!text) {
-			res.send('no text')
+			res.status(400).json({ error: 'You did not provide any text' })
 			return
 		}
 		if (!textColor) {
-			res.send('no textColor')
+			res.status(400).json({ error: 'You did not provide any textColor' })
 			return
 		}
 		if (!backgroundColor) {
-			res.send('no backgroundColor')
+			res.status(400).json({ error: 'You did not provide any backgroundColor' })
 			return
 		}
 
@@ -662,12 +711,12 @@ app.get('/api/say', (req, res) => {
 
 		// If textColor or backgroundColor is a string or an instance of Error, send a 400 response with the problematic color
 		if (typeof textColor == 'string') {
-			res.status(400).send(textColor)
+			res.status(400).json({ error: textColor })
 			return
 		}
 		if (textColor instanceof Error) throw textColor
 		if (typeof backgroundColor == 'string') {
-			res.status(400).send(backgroundColor)
+			res.status(400).json({ error: backgroundColor })
 			return
 		}
 		if (backgroundColor instanceof Error) throw backgroundColor
@@ -678,7 +727,7 @@ app.get('/api/say', (req, res) => {
 		res.status(200).send('ok')
 	} catch (err) {
 		// If an error occurs, send a 500 response with 'error'
-		res.status(500).send('error')
+		res.status(500).json({ error: 'There was a server error try again' })
 	}
 })
 
@@ -699,7 +748,7 @@ app.use((req, res, next) => {
 
 		res.status(404).json({ error: `The page ${urlPath} does not exist` })
 	} catch (err) {
-		res.status(500).send('error')
+		res.status(500).json({ error: 'There was a server error try again' })
 	}
 })
 
@@ -734,7 +783,7 @@ socket.on('connect', () => {
 	connected = true
 
 	// Display the board with the IP address, white color, black background, and true for the clear flag
-	displayBoard(config.ip.split('://')[1], 0xFFFFFF, 0x000000, true)
+	displayBoard(config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000, true)
 
 	// Play the bootup sound effect
 	player.play('./sfx/sfx_bootup02.wav')
@@ -749,7 +798,7 @@ socket.on('setClass', (userClass) => {
 		// Set the fill color to black
 		fill(0x000000)
 		// Display the board with the specified parameters
-		displayBoard(config.ip.split('://')[1], 0xFFFFFF, 0x000000, true)
+		displayBoard(config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000, true)
 		// Render the changes
 		ws281x.render()
 	} else {
@@ -768,7 +817,7 @@ socket.on('vbUpdate', (newPollData) => {
 
 	// If the poll status is false, clear the display and return
 	if (!newPollData.status) {
-		displayBoard(config.ip.split('://')[1], 0xFFFFFF, 0x000000)
+		displayBoard(config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000)
 		ws281x.render()
 		pollData = newPollData
 		return
