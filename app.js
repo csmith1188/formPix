@@ -155,7 +155,7 @@ function safeJsonParse(string) {
 function textToHexColor(color) {
 	try {
 		// Check if the input is a string
-		if (typeof color != 'string') return "Input must be a string";
+		if (typeof color != 'string') return "Color must be a string";
 
 		// Check if the color is in hexadecimal format
 		if (color.startsWith('#')) {
@@ -504,6 +504,20 @@ app.use(async (req, res, next) => {
 	}
 })
 
+// check for multiple of the same query parameter
+app.use((req, res, next) => {
+	let query = req.query
+
+	for (let key in query) {
+		if (Array.isArray(query[key])) {
+			res.status(400).json({ error: `You can only have one ${key} parameter` })
+			return
+		}
+	}
+
+	next()
+})
+
 // Route to fill the bar with a color
 app.get('/api/fill', (req, res) => {
 	try {
@@ -518,6 +532,9 @@ app.get('/api/fill', (req, res) => {
 		if (typeof color == 'string') {
 			res.status(400).json({ error: color })
 			return
+		}
+		if (Array.isArray(color)) {
+			console.log('color is an array');
 		}
 		// If color is an instance of Error, throw the error
 		if (color instanceof Error) throw color
