@@ -848,6 +848,10 @@ socket.on('connect_error', (error) => {
 	connected = false
 
 	// Fill the bar with black color
+	if (textInterval) {
+		clearInterval(textInterval)
+		textInterval = null
+	}
 	fill(0x000000)
 	// Render the changes
 	ws281x.render()
