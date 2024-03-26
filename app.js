@@ -128,6 +128,8 @@ function rgbToHex(rgb) {
  */
 function safeJsonParse(string) {
 	try {
+		console.log(string);
+
 		// Check if input is a string
 		if (typeof string !== 'string') return "Input must be a string";
 
@@ -140,6 +142,7 @@ function safeJsonParse(string) {
 	} catch (err) {
 		// Check if error is due to invalid JSON
 		if (err.message.toLowerCase().includes('json')) {
+			console.log(err);
 			return "Input is not a valid JSON string";
 		} else throw err;  // Throw any other error
 	}
@@ -158,6 +161,7 @@ function textToHexColor(color) {
 		if (typeof color != 'string') return "Color must be a string";
 
 		// Check if the color is in hexadecimal format
+		console.log(color);
 		if (color.startsWith('#')) {
 			// Remove the '#' from the start of the color
 			color = color.slice(1);
@@ -508,10 +512,7 @@ app.use(async (req, res, next) => {
 app.use((req, res, next) => {
 	let query = req.query
 
-	console.log(query);
-
 	for (let key in query) {
-		console.log(key, query[key]);
 		if (Array.isArray(query[key])) {
 			res.status(400).json({ error: `You can only have one ${key} parameter` })
 			return
@@ -522,7 +523,7 @@ app.use((req, res, next) => {
 })
 
 // Route to fill the bar with a color
-app.get('/api/fill', (req, res) => {
+app.post('/api/fill', (req, res) => {
 	try {
 		// Destructure color, start, and length from the request query
 		// If start and length are not provided, default values are set
@@ -535,9 +536,6 @@ app.get('/api/fill', (req, res) => {
 		if (typeof color == 'string') {
 			res.status(400).json({ error: color })
 			return
-		}
-		if (Array.isArray(color)) {
-			console.log('color is an array');
 		}
 		// If color is an instance of Error, throw the error
 		if (color instanceof Error) throw color
@@ -569,7 +567,7 @@ app.get('/api/fill', (req, res) => {
 		// Render the changes
 		ws281x.render()
 		// Send a 200 status code with 'ok' as the response
-		res.status(200).send('ok')
+		res.status(200).json({ message: 'ok' })
 	} catch (err) {
 		// If any error occurs, send a 500 status code with 'error' as the response
 		res.status(500).json({ error: 'There was a server error try again' })
@@ -577,13 +575,15 @@ app.get('/api/fill', (req, res) => {
 })
 
 // Route to fill a gradient on the bar with a color
-app.get('/api/gradient', (req, res) => {
+app.post('/api/gradient', (req, res) => {
 	try {
 		// Destructure color, start, and length from the request query
 		// If start and length are not provided, default values are set
 		let { startColor, endColor, start = 0, length = pixels.length } = req.query
 
 		// Convert the startColor text to hexadecimal color
+		console.log(req.query);
+		console.log(startColor);
 		startColor = textToHexColor(startColor)
 
 		// If startColor is a string, send a 400 status code with color as the response
@@ -629,11 +629,10 @@ app.get('/api/gradient', (req, res) => {
 
 		// Fill the bar with the specified startColor, start, and length
 		gradient(startColor, endColor, start, length)
-
 		// Render the changes
 		ws281x.render()
 		// Send a 200 status code with 'ok' as the response
-		res.status(200).send('ok')
+		res.status(200).json({ message: 'ok' })
 	} catch (err) {
 		// If any error occurs, send a 500 status code with 'error' as the response
 		res.status(500).json({ error: 'There was a server error try again' })
@@ -641,7 +640,7 @@ app.get('/api/gradient', (req, res) => {
 })
 
 // Route to set a specific pixel with a color
-app.get('/api/setPixel', (req, res) => {
+app.post('/api/setPixel', (req, res) => {
 	try {
 		// Extract pixel and color from the request query
 		let { pixel, color } = req.query
@@ -680,7 +679,7 @@ app.get('/api/setPixel', (req, res) => {
 		ws281x.render()
 
 		// Send a 200 response with 'ok'
-		res.status(200).send('ok')
+		res.status(200).json({ message: 'ok' })
 	} catch (err) {
 		// If an error occurs, send a 500 response with 'error'
 		res.status(500).json({ error: 'There was a server error try again' })
@@ -688,7 +687,7 @@ app.get('/api/setPixel', (req, res) => {
 })
 
 // Route to set multiple pixels with colors
-app.get('/api/setPixels', (req, res) => {
+app.post('/api/setPixels', (req, res) => {
 	try {
 		// Extract pixels from the request query
 		let inputPixels = req.query.pixels
@@ -762,7 +761,7 @@ app.get('/api/setPixels', (req, res) => {
 		ws281x.render()
 
 		// Send a 200 response with 'ok'
-		res.status(200).send('ok')
+		res.status(200).json({ message: 'ok' })
 	} catch (err) {
 		// If an error occurs, send a 500 response with 'error'
 		res.status(500).json({ error: 'There was a server error try again' })
@@ -770,7 +769,7 @@ app.get('/api/setPixels', (req, res) => {
 })
 
 // Route to display a text with a specified text color and background color
-app.get('/api/say', (req, res) => {
+app.post('/api/say', (req, res) => {
 	try {
 		// Extract text, textColor and backgroundColor from the request query
 		let { text, textColor, backgroundColor } = req.query
@@ -808,7 +807,7 @@ app.get('/api/say', (req, res) => {
 		// Call the displayBoard function with the text, textColor, and backgroundColor to display the text with the specified colors
 		displayBoard(text, textColor, backgroundColor)
 		// Send a 200 response with 'ok' to indicate successful operation
-		res.status(200).send('ok')
+		res.status(200).json({ message: 'ok' })
 	} catch (err) {
 		// If an error occurs, send a 500 response with 'error'
 		res.status(500).json({ error: 'There was a server error try again' })
@@ -885,6 +884,11 @@ socket.on('setClass', (userClass) => {
 		classCode = ''
 		// Set the fill color to black
 		fill(0x000000)
+		// clear text interval
+		if (textInterval) {
+			clearInterval(textInterval)
+			textInterval = null
+		}
 		// Display the board with the specified parameters
 		displayBoard(config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000, true)
 		// Render the changes
@@ -895,6 +899,7 @@ socket.on('setClass', (userClass) => {
 		// Emit 'vbUpdate' event to the socket
 		socket.emit('vbUpdate')
 	}
+	console.log('Changes to class:', userClass);
 })
 
 // Listen for 'vbUpdate' event from the socket
