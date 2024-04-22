@@ -9,6 +9,7 @@ const player = require('play-sound')({ player: 'omxplayer' })
 
 
 // Constants
+const PIXELS_PER_LETTER = 5
 const BOARD_WIDTH = 32
 const BOARD_HEIGHT = 8
 const END_POINT_PERMISSIONS = {
@@ -44,7 +45,8 @@ let connected = false
 let classCode = ''
 let pollData = {}
 let textInterval = null
-let currentText = ''
+let boardIntervals = []
+
 
 
 // Set Up
@@ -128,8 +130,6 @@ function rgbToHex(rgb) {
  */
 function safeJsonParse(string) {
 	try {
-		console.log(string);
-
 		// Check if input is a string
 		if (typeof string !== 'string') return "Input must be a string";
 
@@ -142,7 +142,6 @@ function safeJsonParse(string) {
 	} catch (err) {
 		// Check if error is due to invalid JSON
 		if (err.message.toLowerCase().includes('json')) {
-			console.log(err);
 			return "Input is not a valid JSON string";
 		} else throw err;  // Throw any other error
 	}
@@ -161,7 +160,6 @@ function textToHexColor(color) {
 		if (typeof color != 'string') return "Color must be a string";
 
 		// Check if the color is in hexadecimal format
-		console.log(color);
 		if (color.startsWith('#')) {
 			// Remove the '#' from the start of the color
 			color = color.slice(1);
@@ -333,19 +331,19 @@ function gradient(startColor, endColor, start = 0, length = pixels.length) {
  * @param {string} textColor - The color of the text.
  * @param {string} backgroundColor - The color of the background.
  */
-function showString(boardPixels, start, textColor, backgroundColor) {
+function showString(boardPixels, startFrame, textColor, backgroundColor, startPixel, endPixel) {
 	// Clone the board pixels
 	let newBoardPixels = structuredClone(boardPixels);
-	let currentPixel = config.barPixels;
-	let currentColumn = start;
+	let currentPixel = startPixel;
+	let currentColumn = startFrame;
 	let maxColumns = newBoardPixels.length;
 
 	// Fill with black color
-	fill(0x000000, config.barPixels);
+	fill(0x000000, startPixel, startPixel - endPixel);
 
-	// Reverse every other column, starting from the start column
+	// Reverse every other column, starting from the startFrame column
 	for (let i = 0; i < newBoardPixels.length; i++) {
-		if (start % 2 === i % 2) {
+		if (startFrame % 2 === i % 2) {
 			newBoardPixels[i] = newBoardPixels[i].reverse();
 		}
 	}
@@ -358,6 +356,8 @@ function showString(boardPixels, start, textColor, backgroundColor) {
 		for (let pixel of col) {
 			pixels[currentPixel] = pixel ? textColor : backgroundColor;
 			currentPixel++;
+
+			if (currentPixel >= endPixel) return
 		}
 
 		// Move to the next column, wrapping around if necessary
@@ -374,22 +374,41 @@ function showString(boardPixels, start, textColor, backgroundColor) {
  * @param {string} backgroundColor - The color of the background.
  * @param {boolean} [forced=false] - Force the display of the string even if it's the same as the current one.
  */
-function displayBoard(string, textColor, backgroundColor, forced = false) {
+function displayBoard(string, textColor, backgroundColor, forced = false, startColumn = 0, endColumn = config.boards * BOARD_WIDTH) {
 	// Convert the string to lowercase
 	string = string.toLowerCase();
+	let stringColumnLength = getStringColumnLength(string);
+
+	let startPixel = config.barPixels + startColumn * 8
+
+	if (stringColumnLength + startColumn < endColumn)
+		endColumn = stringColumnLength + startColumn
+
+	let endPixel = config.barPixels + endColumn * 8
 
 	// Initialize the board pixels with an empty row
 	let boardPixels = [Array(8).fill(0)];
 
-	// If the current text is the same as the input string and the display is not forced, return
-	if (currentText == string && !forced) return
-
-	// Set the current text to the input string
-	currentText = string
-
 	// Clear any existing text display interval
-	clearInterval(textInterval)
-	textInterval = null;
+	for (let boardInterval of boardIntervals) {
+		if (!boardInterval) continue
+
+		if (
+			string == boardInterval.string &&
+			startColumn == boardInterval.startColumn &&
+			endColumn == boardInterval.endColumn
+		) return
+	}
+
+	boardIntervals = boardIntervals.filter(boardInterval => {
+		if (
+			startColumn < boardInterval.endColumn &&
+			endColumn > boardInterval.startColumn
+		) {
+			clearInterval(boardInterval.interval);
+			return false
+		} else return true
+	})
 
 	// For each letter in the string
 	for (let letter of string) {
@@ -408,13 +427,21 @@ function displayBoard(string, textColor, backgroundColor, forced = false) {
 		boardPixels.push(Array(8).fill(0));
 	}
 
+
+
 	// If the board pixels fit on the board
-	if (boardPixels.length <= config.boards * BOARD_WIDTH) {
+	if (boardPixels.length - 1 <= endColumn - startColumn) {
 		// Show the string on the board
-		showString(boardPixels, 0, textColor, backgroundColor);
+		showString(boardPixels, 0, textColor, backgroundColor, startPixel, endPixel);
 
 		// Render the board
 		ws281x.render();
+
+		return {
+			string,
+			startColumn,
+			endColumn
+		}
 	} else {
 		// If the board pixels don't fit on the board
 
@@ -424,22 +451,31 @@ function displayBoard(string, textColor, backgroundColor, forced = false) {
 		}
 
 		// Initialize the start column
-		let startColumn = 0;
+		let startFrame = 0;
 
 		// Start an interval to scroll the string on the board
-		textInterval = setInterval(() => {
-			// Show the string on the board starting from the start column
-			showString(boardPixels, startColumn, textColor, backgroundColor);
+		return {
+			string,
+			interval: setInterval(() => {
+				// Show the string on the board starting from the start column
+				showString(boardPixels, startFrame, textColor, backgroundColor, startPixel, endPixel);
 
-			// Move the start column to the right, wrapping around to the start if necessary
-			startColumn = (startColumn + 1) % boardPixels.length;
+				// Move the start column to the right, wrapping around to the start if necessary
+				startFrame = (startFrame + 1) % boardPixels.length;
 
-			// Render the board
-			ws281x.render();
-		}, 250);
+				// Render the board
+				ws281x.render();
+			}, 250),
+			startColumn,
+			endColumn
+		}
 	}
 }
 
+
+function getStringColumnLength(text) {
+	return (text.length * (PIXELS_PER_LETTER + 1))
+}
 
 // express api
 // check connection
@@ -582,8 +618,6 @@ app.post('/api/gradient', (req, res) => {
 		let { startColor, endColor, start = 0, length = pixels.length } = req.query
 
 		// Convert the startColor text to hexadecimal color
-		console.log(req.query);
-		console.log(startColor);
 		startColor = textToHexColor(startColor)
 
 		// If startColor is a string, send a 400 status code with color as the response
@@ -805,7 +839,7 @@ app.post('/api/say', (req, res) => {
 		if (backgroundColor instanceof Error) throw backgroundColor
 
 		// Call the displayBoard function with the text, textColor, and backgroundColor to display the text with the specified colors
-		displayBoard(text, textColor, backgroundColor)
+		textInterval = displayBoard(text, textColor, backgroundColor)
 		// Send a 200 response with 'ok' to indicate successful operation
 		res.status(200).json({ message: 'ok' })
 	} catch (err) {
@@ -846,11 +880,12 @@ socket.on('connect_error', (error) => {
 	// Set the connected flag to false
 	connected = false
 
-	// Fill the bar with black color
-	if (textInterval) {
-		clearInterval(textInterval)
-		textInterval = null
-	}
+	// clear all board intervals
+	boardIntervals = boardIntervals.filter(boardInterval => {
+		clearInterval(boardInterval.interval);
+		return false
+	})
+
 	fill(0x000000)
 	// Render the changes
 	ws281x.render()
@@ -870,7 +905,9 @@ socket.on('connect', () => {
 	connected = true
 
 	// Display the board with the IP address, white color, black background, and true for the clear flag
-	displayBoard(config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000, true)
+	let display = displayBoard(config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000, true)
+	if (!display) return
+	boardIntervals.push(display)
 
 	// Play the bootup sound effect
 	player.play('./sfx/sfx_bootup02.wav')
@@ -890,7 +927,9 @@ socket.on('setClass', (userClass) => {
 			textInterval = null
 		}
 		// Display the board with the specified parameters
-		displayBoard(config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000, true)
+		let display = displayBoard(config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000, true)
+		if (!display) return
+		boardIntervals.push(display)
 		// Render the changes
 		ws281x.render()
 	} else {
@@ -899,18 +938,22 @@ socket.on('setClass', (userClass) => {
 		// Emit 'vbUpdate' event to the socket
 		socket.emit('vbUpdate')
 	}
-	console.log('Changes to class:', userClass);
+	console.log('Moved to class:', userClass);
 })
 
 // Listen for 'vbUpdate' event from the socket
 socket.on('vbUpdate', (newPollData) => {
 	let pixelsPerStudent
 	let text = ''
+	let pollText = 'Poll'
 	let pollResponses = 0
 
 	// If the poll status is false, clear the display and return
 	if (!newPollData.status) {
-		displayBoard(config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000)
+		let display = displayBoard(config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000, true)
+		if (!display) return
+		boardIntervals.push(display)
+
 		ws281x.render()
 		pollData = newPollData
 		return
@@ -942,7 +985,9 @@ socket.on('vbUpdate', (newPollData) => {
 		if (newPollData.prompt == 'Thumbs?') {
 			if (newPollData.polls.Up.responses == newPollData.totalStudents) {
 				gradient(0x0000FF, 0xFF0000, 0, config.barPixels)
-				displayBoard('Max Gamer', 0xFF0000, 0x000000)
+				let display = displayBoard('Max Gamer', 0xFF0000, 0x000000)
+				if (!display) return
+				boardIntervals.push(display)
 				player.play('./sfx/sfx_success01.wav')
 				pollData = newPollData
 				return
@@ -950,16 +995,27 @@ socket.on('vbUpdate', (newPollData) => {
 				player.play('./sfx/bruh.wav')
 			} else if (newPollData.polls.Down.responses == newPollData.totalStudents) {
 				player.play('./sfx/wompwomp.wav')
-				displayBoard('Git Gud', 0xFF0000, 0x000000)
+				let display = displayBoard('Git Gud', 0xFF0000, 0x000000)
+				if (!display) return
+				boardIntervals.push(display)
 			}
 		}
 	}
 
 	// Set the display text based on the prompt and poll responses
-	if (newPollData.prompt) text += newPollData.prompt
-	else text += 'Poll'
-	text += ` ${pollResponses}/${newPollData.totalStudents}`
-	displayBoard(text, 0xFFFFFF, 0x000000)
+	text += `${pollResponses}/${newPollData.totalStudents} `
+	if (newPollData.prompt) pollText = newPollData.prompt
+
+	// fill(0x000000, config.barPixels)
+
+	let display = displayBoard(text, 0xFFFFFF, 0x000000)
+	if (display) boardIntervals.push(display)
+
+	setTimeout(() => {
+		display = displayBoard(pollText, 0xFFFFFF, 0x000000, false, getStringColumnLength(text))
+		if (display) boardIntervals.push(display)
+	}, 2000);
+
 
 	// Count non-empty polls
 	let nonEmptyPolls = -1
@@ -1062,5 +1118,5 @@ socket.on('endClassSound', () => {
 // Start the HTTP server and listen on the port specified in the configuration
 httpServer.listen(config.port, async () => {
 	// Log a message to the console indicating the port number the server is running on
-	console.log(`Server is up and running on port: ${config.port}`)
+	console.log(`Server running on port: ${config.port}`)
 })
