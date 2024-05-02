@@ -39,16 +39,6 @@ let strip = ws281x(maxPixels, {
 })
 
 
-// Variables
-let pixels = strip.array
-let connected = false
-let classCode = ''
-let pollData = {}
-let textInterval = null
-let boardIntervals = []
-
-
-
 // Set Up
 // clear pixels
 fill(0x000000)
@@ -75,19 +65,14 @@ const socket = io(config.formbarUrl, {
  * @throws {Error} Will throw an error if an issue occurs during execution.
  */
 function fill(color, start = 0, length = pixels.length) {
-	try {
-		// If the length provided is greater than or equal to the length of the pixels array,
-		// set the length to the length of the pixels array to avoid out of bounds errors.
-		if (length >= pixels.length) length = pixels.length;
+	// If the length provided is greater than or equal to the length of the pixels array,
+	// set the length to the length of the pixels array to avoid out of bounds errors.
+	if (length >= pixels.length) length = pixels.length - start;
 
-		// Loop through the specified portion of the pixels array
-		for (let i = 0; i < length; i++) {
-			// Set each pixel in the specified range to the provided color
-			pixels[i + start] = color;
-		}
-	} catch (err) {
-		// If an error occurs, re-throw it to be handled by the caller
-		throw err;
+	// Loop through the specified portion of the pixels array
+	for (let i = 0; i < length; i++) {
+		// Set each pixel in the specified range to the provided color
+		pixels[i + start] = color;
 	}
 }
 
@@ -99,14 +84,10 @@ function fill(color, start = 0, length = pixels.length) {
  * @throws {Error} Will throw an error if an issue occurs during execution.
  */
 function hexToRgb(hex) {
-	try {
-		// Shift the bits of the hex value to get the red, green, and blue values.
-		// The "& 255" operation is used to ensure we only get the last 8 bits (one byte) of the result.
-		// This is because each color component in an RGB value is represented by one byte.
-		return [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255];
-	} catch (err) {
-		throw err
-	}
+	// Shift the bits of the hex value to get the red, green, and blue values.
+	// The "& 255" operation is used to ensure we only get the last 8 bits (one byte) of the result.
+	// This is because each color component in an RGB value is represented by one byte.
+	return [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255];
 }
 
 /**
@@ -114,6 +95,7 @@ function hexToRgb(hex) {
  *
  * @param {Array.<number>} rgb - The RGB color value as an array.
  * @returns {number} The hexadecimal color value.
+ * @throws {Error} Will throw an error if an issue occurs during execution.
  */
 function rgbToHex(rgb) {
 	// Shift the bits of the RGB values to get the hexadecimal color value.
@@ -155,56 +137,51 @@ function safeJsonParse(string) {
  * @throws {Error} - If an error other than invalid input occurs.
  */
 function textToHexColor(color) {
-	try {
-		// Check if the input is a string
-		if (typeof color != 'string') return "Color must be a string";
+	// Check if the input is a string
+	if (typeof color != 'string') return "Color must be a string";
 
-		// Check if the color is in hexadecimal format
-		if (color.startsWith('#')) {
-			// Remove the '#' from the start of the color
-			color = color.slice(1);
+	// Check if the color is in hexadecimal format
+	if (color.startsWith('#')) {
+		// Remove the '#' from the start of the color
+		color = color.slice(1);
 
-			// Check if the color is 6 characters long
-			if (color.length != 6) return "Hex color must be 6 characters long";
+		// Check if the color is 6 characters long
+		if (color.length != 6) return "Hex color must be 6 characters long";
 
-			// Convert the color to a number and return it
-			return Number.parseInt(color, 16)
-		}
-
-		// Try to parse the color as a JSON string
-		color = safeJsonParse(color);
-
-		if (typeof color == 'string') return color;
-		if (color instanceof Error) throw color;
-
-		let red, green, blue;
-
-		// Get the keys of the color object
-		keys = Object.keys(color)
-
-		// Check if the keys are 'red', 'green', and 'blue'
-		if (keys.every(item => ['red', 'green', 'blue'].includes(item))) {
-			red = color.red
-			green = color.green
-			blue = color.blue
-			// Check if the keys are 'r', 'g', and 'b'
-		} else if (keys.every(item => ['r', 'g', 'b'].includes(item))) {
-			red = color.r
-			green = color.g
-			blue = color.b
-		} else return "Invalid color keys";
-
-		// Check if the color values are integers between 0 and 255
-		if ([red, green, blue].some(item =>
-			item < 0 || item > 255 || !Number.isInteger(item)
-		)) return "Color values must be integers between 0 and 255";
-
-		// Convert the color to hexadecimal format and return it
-		return rgbToHex([red, green, blue])
-	} catch (err) {
-		// Throw any other error that might occur
-		throw err
+		// Convert the color to a number and return it
+		return Number.parseInt(color, 16)
 	}
+
+	// Try to parse the color as a JSON string
+	color = safeJsonParse(color);
+
+	if (typeof color == 'string') return color;
+	if (color instanceof Error) throw color;
+
+	let red, green, blue;
+
+	// Get the keys of the color object
+	keys = Object.keys(color)
+
+	// Check if the keys are 'red', 'green', and 'blue'
+	if (keys.every(item => ['red', 'green', 'blue'].includes(item))) {
+		red = color.red
+		green = color.green
+		blue = color.blue
+		// Check if the keys are 'r', 'g', and 'b'
+	} else if (keys.every(item => ['r', 'g', 'b'].includes(item))) {
+		red = color.r
+		green = color.g
+		blue = color.b
+	} else return "Invalid color keys";
+
+	// Check if the color values are integers between 0 and 255
+	if ([red, green, blue].some(item =>
+		item < 0 || item > 255 || !Number.isInteger(item)
+	)) return "Color values must be integers between 0 and 255";
+
+	// Convert the color to hexadecimal format and return it
+	return rgbToHex([red, green, blue])
 }
 
 /**
@@ -215,40 +192,35 @@ function textToHexColor(color) {
  * @throws {Error} If an unexpected error occurs during the validation and calculation process.
  */
 function validateAndCalculatePixel(pixel) {
-	try {
-		// Check if pixel object has 'x' and 'y' properties
-		if (Object.keys(pixel).every(item => !['x', 'y'].includes(item))) return 'invalid pixel format';
+	// Check if pixel object has 'x' and 'y' properties
+	if (Object.keys(pixel).every(item => !['x', 'y'].includes(item))) return 'invalid pixel format';
 
-		// Extract 'x' and 'y' properties from pixel object
-		let x = pixel.x;
-		let y = pixel.y;
+	// Extract 'x' and 'y' properties from pixel object
+	let x = pixel.x;
+	let y = pixel.y;
 
-		// Validate 'x' and 'y' properties
-		if (!x && x != 0) return 'no x';
-		if (!y && y != 0) return 'no y';
-		if (typeof x != 'number') return 'x not a number';
-		if (typeof y != 'number') return 'y not a number';
-		if (!Number.isInteger(x)) return 'x not an integer';
-		if (!Number.isInteger(y)) return 'y not an integer';
-		if (x < 0 || x >= BOARD_WIDTH * config.boards) return 'x out of bounds';
-		if (y < 0 || y >= BOARD_HEIGHT) return 'y out of bounds';
+	// Validate 'x' and 'y' properties
+	if (!x && x != 0) return 'no x';
+	if (!y && y != 0) return 'no y';
+	if (typeof x != 'number') return 'x not a number';
+	if (typeof y != 'number') return 'y not a number';
+	if (!Number.isInteger(x)) return 'x not an integer';
+	if (!Number.isInteger(y)) return 'y not an integer';
+	if (x < 0 || x >= BOARD_WIDTH * config.boards) return 'x out of bounds';
+	if (y < 0 || y >= BOARD_HEIGHT) return 'y out of bounds';
 
-		// Calculate pixel position on the board
-		pixel = config.barPixels;
-		pixel += x * BOARD_HEIGHT;
+	// Calculate pixel position on the board
+	pixel = config.barPixels;
+	pixel += x * BOARD_HEIGHT;
 
-		// Adjust pixel position based on 'x' property
-		if (x % 2 == 1) {
-			pixel += BOARD_HEIGHT - 1;
-			pixel -= y;
-		} else pixel += y;
+	// Adjust pixel position based on 'x' property
+	if (x % 2 == 1) {
+		pixel += BOARD_HEIGHT - 1;
+		pixel -= y;
+	} else pixel += y;
 
-		// Return calculated pixel position
-		return pixel;
-	} catch (err) {
-		// Throw any unexpected error that might occur
-		throw err
-	}
+	// Return calculated pixel position
+	return pixel;
 }
 
 /**
@@ -259,28 +231,23 @@ function validateAndCalculatePixel(pixel) {
  * @throws {Error} - If an unexpected error occurs during the parsing and validation process.
  */
 function getPixelNumber(pixel) {
-	try {
-		// If pixel is a number or a string representing a number, return it as a number
-		if (!isNaN(pixel)) {
-			if (typeof pixel == 'number') return pixel;
-			else return Number(pixel);
-		} else if (typeof pixel == 'string') {
-			// If pixel is a string, try to parse it as a JSON string
-			pixel = safeJsonParse(pixel);
+	// If pixel is a number or a string representing a number, return it as a number
+	if (!isNaN(pixel)) {
+		if (typeof pixel == 'number') return pixel;
+		else return Number(pixel);
+	} else if (typeof pixel == 'string') {
+		// If pixel is a string, try to parse it as a JSON string
+		pixel = safeJsonParse(pixel);
 
-			// If parsing failed, return the error message
-			if (typeof pixel == 'string') return pixel
-			if (pixel instanceof Error) throw pixel
+		// If parsing failed, return the error message
+		if (typeof pixel == 'string') return pixel
+		if (pixel instanceof Error) throw pixel
 
-			// If parsing succeeded, validate and calculate the pixel number
-			return validateAndCalculatePixel(pixel);
-		} else if (typeof pixel == 'object' && !Array.isArray(pixel)) {
-			// If pixel is an object (and not an array), validate and calculate the pixel number
-			return validateAndCalculatePixel(pixel);
-		}
-	} catch (err) {
-		// If an unexpected error occurs, throw it
-		throw err
+		// If parsing succeeded, validate and calculate the pixel number
+		return validateAndCalculatePixel(pixel);
+	} else if (typeof pixel == 'object' && !Array.isArray(pixel)) {
+		// If pixel is an object (and not an array), validate and calculate the pixel number
+		return validateAndCalculatePixel(pixel);
 	}
 }
 
@@ -324,12 +291,14 @@ function gradient(startColor, endColor, start = 0, length = pixels.length) {
 }
 
 /**
- * Displays a string on the board.
+ * This function displays a string on a board of pixels.
  *
- * @param {Array} boardPixels - The pixels of the board.
- * @param {number} start - The starting position for displaying the string.
- * @param {string} textColor - The color of the text.
- * @param {string} backgroundColor - The color of the background.
+ * @param {Array} boardPixels - The original board pixels.
+ * @param {Number} startFrame - The starting frame for the display.
+ * @param {String} textColor - The color of the text to be displayed.
+ * @param {String} backgroundColor - The color of the background.
+ * @param {Number} startPixel - The starting pixel for the display.
+ * @param {Number} endPixel - The ending pixel for the display.
  */
 function showString(boardPixels, startFrame, textColor, backgroundColor, startPixel, endPixel) {
 	// Clone the board pixels
@@ -339,7 +308,7 @@ function showString(boardPixels, startFrame, textColor, backgroundColor, startPi
 	let maxColumns = newBoardPixels.length;
 
 	// Fill with black color
-	fill(0x000000, startPixel, startPixel - endPixel);
+	fill(0x000000, startPixel, endPixel - startPixel);
 
 	// Reverse every other column, starting from the startFrame column
 	for (let i = 0; i < newBoardPixels.length; i++) {
@@ -365,16 +334,16 @@ function showString(boardPixels, startFrame, textColor, backgroundColor, startPi
 	}
 }
 
-
 /**
  * Display a string on a LED board.
  *
  * @param {string} string - The string to display.
  * @param {string} textColor - The color of the text.
  * @param {string} backgroundColor - The color of the background.
- * @param {boolean} [forced=false] - Force the display of the string even if it's the same as the current one.
+ * @param {number} [startColumn=0] - The starting column to display the string.
+ * @param {number} [endColumn=config.boards * BOARD_WIDTH] - The ending column to display the string.
  */
-function displayBoard(string, textColor, backgroundColor, forced = false, startColumn = 0, endColumn = config.boards * BOARD_WIDTH) {
+function displayBoard(string, textColor, backgroundColor, startColumn = 0, endColumn = config.boards * BOARD_WIDTH) {
 	// Convert the string to lowercase
 	string = string.toLowerCase();
 	let stringColumnLength = getStringColumnLength(string);
@@ -427,8 +396,6 @@ function displayBoard(string, textColor, backgroundColor, forced = false, startC
 		boardPixels.push(Array(8).fill(0));
 	}
 
-
-
 	// If the board pixels fit on the board
 	if (boardPixels.length - 1 <= endColumn - startColumn) {
 		// Show the string on the board
@@ -445,9 +412,9 @@ function displayBoard(string, textColor, backgroundColor, forced = false, startC
 	} else {
 		// If the board pixels don't fit on the board
 
-		// Add a space to the end of the board pixels
-		for (let col of letters[' '].map(arr => arr.slice())) {
-			boardPixels.push(col);
+		// Add 2 spaces to the beginning of the board pixels
+		for (let i = 0; i < 2 * 6 + 1; i++) {
+			boardPixels.unshift([0, 0, 0, 0, 0, 0, 0, 0]);
 		}
 
 		// Initialize the start column
@@ -465,17 +432,37 @@ function displayBoard(string, textColor, backgroundColor, forced = false, startC
 
 				// Render the board
 				ws281x.render();
-			}, 250),
+			}, 200),
 			startColumn,
 			endColumn
 		}
 	}
 }
 
-
+/**
+ * Calculates the length of a string column based on the number of characters in the text.
+ * @param {string} text - The input text.
+ * @returns {number} The amount of columns in the string.
+ */
 function getStringColumnLength(text) {
 	return (text.length * (PIXELS_PER_LETTER + 1))
 }
+
+
+// Variables
+let pixels = strip.array
+let connected = false
+let classCode = ''
+let pollData = {}
+let textInterval = null
+let currentText = ''
+let timerData = {
+	startTime: 0,
+	timeLeft: 0,
+	active: false,
+	sound: false
+}
+
 
 // express api
 // check connection
@@ -618,6 +605,8 @@ app.post('/api/gradient', (req, res) => {
 		let { startColor, endColor, start = 0, length = pixels.length } = req.query
 
 		// Convert the startColor text to hexadecimal color
+		console.log(req.query);
+		console.log(startColor);
 		startColor = textToHexColor(startColor)
 
 		// If startColor is a string, send a 400 status code with color as the response
@@ -839,7 +828,7 @@ app.post('/api/say', (req, res) => {
 		if (backgroundColor instanceof Error) throw backgroundColor
 
 		// Call the displayBoard function with the text, textColor, and backgroundColor to display the text with the specified colors
-		textInterval = displayBoard(text, textColor, backgroundColor)
+		displayBoard(text, textColor, backgroundColor)
 		// Send a 200 response with 'ok' to indicate successful operation
 		res.status(200).json({ message: 'ok' })
 	} catch (err) {
@@ -905,7 +894,7 @@ socket.on('connect', () => {
 	connected = true
 
 	// Display the board with the IP address, white color, black background, and true for the clear flag
-	let display = displayBoard(config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000, true)
+	let display = displayBoard(config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000)
 	if (!display) return
 	boardIntervals.push(display)
 
@@ -919,52 +908,49 @@ socket.on('setClass', (userClass) => {
 	if (userClass == 'noClass') {
 		// Set classCode to an empty string
 		classCode = ''
-		// Set the fill color to black
-		fill(0x000000)
-		// clear text interval
-		if (textInterval) {
-			clearInterval(textInterval)
-			textInterval = null
-		}
+
+		// Clear the bar
+		fill(0x000000, 0, config.barPixels)
+
 		// Display the board with the specified parameters
-		let display = displayBoard(config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000, true)
+		let display = displayBoard(config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000)
 		if (!display) return
 		boardIntervals.push(display)
-		// Render the changes
+
 		ws281x.render()
 	} else {
 		// If the userClass is not 'noClass', set classCode to userClass
 		classCode = userClass
 		// Emit 'vbUpdate' event to the socket
 		socket.emit('vbUpdate')
+		socket.emit('vbTimer')
 	}
 	console.log('Moved to class:', userClass);
 })
 
-// Listen for 'vbUpdate' event from the socket
 socket.on('vbUpdate', (newPollData) => {
 	let pixelsPerStudent
 	let text = ''
 	let pollText = 'Poll'
 	let pollResponses = 0
+	let blind = newPollData.blind
+	let specialDisplay = false
+
+	// If new poll data is the same as the old, return
+	if (util.isDeepStrictEqual(newPollData, pollData)) return
 
 	// If the poll status is false, clear the display and return
 	if (!newPollData.status) {
-		let display = displayBoard(config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000, true)
-		if (!display) return
-		boardIntervals.push(display)
+		fill(0x000000, 0, config.barPixels)
 
-		ws281x.render()
+		let display = displayBoard(config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000)
+		if (display) {
+			boardIntervals.push(display)
+			ws281x.render()
+		}
+
 		pollData = newPollData
 		return
-	}
-
-	// Set the initial fill color
-	fill(0x808080, 0, config.barPixels)
-
-	// Convert colors from hex to integers for each poll
-	for (let poll of Object.values(newPollData.polls)) {
-		poll.color = parseInt(poll.color.slice(1), 16)
 	}
 
 	// Count total poll responses
@@ -972,92 +958,99 @@ socket.on('vbUpdate', (newPollData) => {
 		pollResponses += poll.responses
 	}
 
-	// If total students equals poll responses, disable blind mode
-	if (newPollData.totalStudents == pollResponses) {
-		newPollData.blind = false
-	}
+	if (!timerData.active) {
+		// Set the initial fill color
+		fill(0x808080, 0, config.barPixels)
 
-	// If new poll data is the same as the old, return
-	if (util.isDeepStrictEqual(newPollData, pollData)) return
+		// Convert colors from hex to integers for each poll
+		for (let poll of Object.values(newPollData.polls)) {
+			poll.color = parseInt(poll.color.slice(1), 16)
+		}
 
-	// If total students equals poll responses, play specific sounds and display messages based on the prompt
-	if (newPollData.totalStudents == pollResponses) {
-		if (newPollData.prompt == 'Thumbs?') {
-			if (newPollData.polls.Up.responses == newPollData.totalStudents) {
-				gradient(0x0000FF, 0xFF0000, 0, config.barPixels)
-				let display = displayBoard('Max Gamer', 0xFF0000, 0x000000)
-				if (!display) return
-				boardIntervals.push(display)
-				player.play('./sfx/sfx_success01.wav')
-				pollData = newPollData
-				return
-			} else if (newPollData.polls.Wiggle.responses == newPollData.totalStudents) {
-				player.play('./sfx/bruh.wav')
-			} else if (newPollData.polls.Down.responses == newPollData.totalStudents) {
-				player.play('./sfx/wompwomp.wav')
-				let display = displayBoard('Git Gud', 0xFF0000, 0x000000)
-				if (!display) return
-				boardIntervals.push(display)
+		// If total students equals poll responses, play specific sounds and display messages based on the prompt
+		if (pollResponses == newPollData.totalResponders && !newPollData.multiRes) {
+			blind = false
+
+			if (newPollData.prompt == 'Thumbs?') {
+				fill(0x000000, config.barPixels)
+				specialDisplay = true
+
+				if (newPollData.polls.Up.responses == newPollData.totalResponders) {
+					gradient(0x0000FF, 0xFF0000, 0, config.barPixels)
+					let display = displayBoard('Max Gamer', 0xFF0000, 0x000000)
+					if (!display) return
+					boardIntervals.push(display)
+					player.play('./sfx/sfx_success01.wav')
+
+					return
+				} else if (newPollData.polls.Wiggle.responses == newPollData.totalResponders) {
+					player.play('./sfx/bruh.wav')
+				} else if (newPollData.polls.Down.responses == newPollData.totalResponders) {
+					player.play('./sfx/wompwomp.wav')
+					let display = displayBoard('Git Gud', 0xFF0000, 0x000000)
+					if (!display) return
+					boardIntervals.push(display)
+				}
 			}
+		}
+
+		// Count non-empty polls
+		let nonEmptyPolls = -1
+		for (let poll of Object.values(newPollData.polls)) {
+			if (poll.responses > 0) {
+				nonEmptyPolls++
+			}
+		}
+
+		// Calculate pixels per student, considering non-empty polls
+		if (newPollData.totalResponders <= 0) pixelsPerStudent = 0
+		else pixelsPerStudent = Math.floor((config.barPixels - nonEmptyPolls) / newPollData.totalResponders) - 1
+
+		// Add polls to the display
+		let currentPixel = 0
+		let pollNumber = 0
+		for (let poll of Object.values(newPollData.polls)) {
+			// For each response
+			for (let responseNumber = 0; responseNumber < poll.responses; responseNumber++) {
+				let color = poll.color
+				if (blind) color = 0xFF8000
+
+				// Set response to color
+				fill(color, currentPixel, pixelsPerStudent)
+				currentPixel += pixelsPerStudent
+
+				// Set spacers
+				if (
+					responseNumber < poll.responses - 1 ||
+					pollNumber < nonEmptyPolls
+				) {
+					pixels[currentPixel] = 0xFF0080
+					currentPixel++
+				}
+			}
+
+			// If not in blind mode and there are responses, increment current pixel
+			if (
+				!blind &&
+				poll.responses > 0
+			) currentPixel++
+			pollNumber++
 		}
 	}
 
 	// Set the display text based on the prompt and poll responses
-	text += `${pollResponses}/${newPollData.totalStudents} `
+	text += `${pollResponses}/${newPollData.totalResponders} `
 	if (newPollData.prompt) pollText = newPollData.prompt
 
-	// fill(0x000000, config.barPixels)
 
-	let display = displayBoard(text, 0xFFFFFF, 0x000000)
-	if (display) boardIntervals.push(display)
+	if (!specialDisplay) {
+		fill(0x000000, config.barPixels + getStringColumnLength(text + pollText) * BOARD_HEIGHT)
 
-	setTimeout(() => {
-		display = displayBoard(pollText, 0xFFFFFF, 0x000000, false, getStringColumnLength(text))
+		let display = displayBoard(text, 0xFFFFFF, 0x000000)
 		if (display) boardIntervals.push(display)
-	}, 2000);
 
-
-	// Count non-empty polls
-	let nonEmptyPolls = -1
-	for (let poll of Object.values(newPollData.polls)) {
-		if (poll.responses > 0) {
-			nonEmptyPolls++
-		}
-	}
-
-	// Calculate pixels per student, considering non-empty polls
-	if (newPollData.totalStudents <= 0) pixelsPerStudent = 0
-	else pixelsPerStudent = Math.floor((config.barPixels - nonEmptyPolls) / newPollData.totalStudents)
-
-	// Add polls to the display
-	let currentPixel = 0
-	let pollNumber = 0
-	for (let [name, poll] of Object.entries(newPollData.polls)) {
-		// For each response
-		for (let responseNumber = 0; responseNumber < poll.responses; responseNumber++) {
-			let color = poll.color
-			if (newPollData.blind) color = 0xFF8000
-
-			// Set response to color
-			fill(color, currentPixel, pixelsPerStudent)
-			currentPixel += pixelsPerStudent
-
-			// Set spacers
-			if (
-				responseNumber < poll.responses - 1 ||
-				pollNumber < nonEmptyPolls
-			) {
-				pixels[currentPixel] = 0xFF0080
-				currentPixel++
-			}
-		}
-
-		// If not in blind mode and there are responses, increment current pixel
-		if (
-			!newPollData.blind &&
-			poll.responses > 0
-		) currentPixel++
-		pollNumber++
+		display = displayBoard(pollText, 0xFFFFFF, 0x000000, getStringColumnLength(text))
+		if (display) boardIntervals.push(display)
 	}
 
 	// Update poll data
@@ -1067,56 +1060,75 @@ socket.on('vbUpdate', (newPollData) => {
 	ws281x.render()
 })
 
-// Listen for 'helpSound' event from the socket
 socket.on('helpSound', () => {
-	// Play the sound file located at './sfx/sfx_up04.wav'
 	player.play('./sfx/sfx_up04.wav')
 })
 
-// Listen for 'breakSound' event from the socket
 socket.on('breakSound', () => {
-	// Play the sound file located at './sfx/sfx_pickup02.wav'
 	player.play('./sfx/sfx_pickup02.wav')
 })
 
-// Listen for 'pollSound' event from the socket
 socket.on('pollSound', () => {
-	// Play the sound file located at './sfx/sfx_blip01.wav'
 	player.play('./sfx/sfx_blip01.wav')
 })
 
-// Listen for 'removePollSound' event from the socket
 socket.on('removePollSound', () => {
-	// Play the sound file located at './sfx/sfx_hit01.wav'
 	player.play('./sfx/sfx_hit01.wav')
 })
 
-// Listen for 'joinSound' event from the socket
 socket.on('joinSound', () => {
-	// Play the sound file located at './sfx/sfx_up02.wav'
 	player.play('./sfx/sfx_up02.wav')
 })
 
-// Listen for 'leaveSound' event from the socket
 socket.on('leaveSound', () => {
-	// Play the sound file located at './sfx/sfx_laser01.wav'
 	player.play('./sfx/sfx_laser01.wav')
 })
 
-// Listen for 'kickStudentsSound' event from the socket
 socket.on('kickStudentsSound', () => {
-	// Play the sound file located at './sfx/sfx_splash01.wav'
 	player.play('./sfx/sfx_splash01.wav')
 })
 
-// Listen for 'endClassSound' event from the socket
 socket.on('endClassSound', () => {
-	// Play the sound file located at './sfx/sfx_explode01.wav'
 	player.play('./sfx/sfx_explode01.wav')
+})
+
+// Listen for 'vbTimer' event from the socket
+socket.on('vbTimer', (newTimerData) => {
+	// Return if no new timer data is received
+	if (!newTimerData) return
+
+	// If timer is not active, reset the display and update the timer data
+	if (!newTimerData.active) {
+		if (timerData.active) {
+			fill(0x000000, 0, config.barPixels)
+			ws281x.render()
+			socket.emit('vbUpdate')
+			timerData = newTimerData
+		}
+		return
+	}
+
+	// If timer is active, calculate and display the time left
+	// If no time is left, display the timer as expired
+	if (newTimerData.timeLeft > 0) {
+		let timeLeftPixels = Math.round(config.barPixels * (newTimerData.timeLeft / newTimerData.startTime))
+		fill(0x0000ff, 0, timeLeftPixels)
+		fill(0xffffff, timeLeftPixels, config.barPixels - timeLeftPixels)
+	} else {
+		fill(0xff0000, 0, config.barPixels)
+	}
+
+	// Update the timer data and render the changes
+	timerData = newTimerData
+	ws281x.render()
+})
+
+socket.on('timerSound', () => {
+	player.play('./sfx/alarmClock.mp3')
 })
 
 // Start the HTTP server and listen on the port specified in the configuration
 httpServer.listen(config.port, async () => {
 	// Log a message to the console indicating the port number the server is running on
-	console.log(`Server running on port: ${config.port}`)
+	console.log(`Server is up and running on port: ${config.port}`)
 })
