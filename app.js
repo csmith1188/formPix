@@ -492,7 +492,6 @@ function playSound({ bgm, sfx }) {
 		if (fs.existsSync(`./bgm/${bgm}`)) {
 			// If it exists, play the bgm
 			player.play(`./bgm/${bgm}`)
-			console.log(`./bgm/${bgm}`);
 			return true
 		} else {
 			// If it does not exist, return an error message
@@ -657,8 +656,6 @@ app.post('/api/gradient', (req, res) => {
 		let { startColor, endColor, start = 0, length = pixels.length } = req.query
 
 		// Convert the startColor text to hexadecimal color
-		console.log(req.query);
-		console.log(startColor);
 		startColor = textToHexColor(startColor)
 
 		// If startColor is a string, send a 400 status code with color as the response
@@ -920,7 +917,6 @@ app.post('/api/playSound', (req, res) => {
 		else res.status(500).json({ error: 'There was a server error try again' })
 	} catch (err) {
 		// If an error occurs, send a 500 response with 'error'
-		console.log(err);
 		res.status(500).json({ error: 'There was a server error try again' })
 	}
 })
