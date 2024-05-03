@@ -18,7 +18,8 @@ const END_POINT_PERMISSIONS = {
 	'/api/setPixel': 'lights',
 	'/api/setPixels': 'lights',
 	'/api/say': 'lights',
-	'/api/playSound': 'sound'
+	'/api/getSounds': 'sounds',
+	'/api/playSound': 'sounds'
 }
 
 
@@ -52,6 +53,10 @@ let timerData = {
 	active: false,
 	sound: false
 }
+let sounds = {
+	bgm: [],
+	sfx: []
+}
 
 
 // Set Up
@@ -69,6 +74,10 @@ const socket = io(config.formbarUrl, {
 	}
 })
 
+
+// Get sounds
+sounds.bgm = fs.readdirSync('./bgm')
+sounds.sfx = fs.readdirSync('./sfx')
 
 // Functions
 /**
@@ -483,6 +492,7 @@ function playSound({ bgm, sfx }) {
 		if (fs.existsSync(`./bgm/${bgm}`)) {
 			// If it exists, play the bgm
 			player.play(`./bgm/${bgm}`)
+			console.log(`./bgm/${bgm}`);
 			return true
 		} else {
 			// If it does not exist, return an error message
@@ -879,6 +889,20 @@ app.post('/api/say', (req, res) => {
 	}
 })
 
+app.post('/api/getSounds', (req, res) => {
+	try {
+		let type = req.query.type
+
+		if (type == 'bgm') res.status(200).json(sounds.bgm)
+		else if (type == 'sfx') res.status(200).json(sounds.sfx)
+		else if (type == null) res.status(200).json(sounds)
+		else res.status(400).json({ error: 'Invalid type' })
+	} catch (err) {
+		// If an error occurs, send a 500 response with 'error'
+		res.status(500).json({ error: 'There was a server error try again' })
+	}
+})
+
 app.post('/api/playSound', (req, res) => {
 	try {
 		let { bgm, sfx } = req.query
@@ -889,8 +913,10 @@ app.post('/api/playSound', (req, res) => {
 			let status = 400
 			if (sound.endsWith(' does not exist.')) status = 404
 
-			res.status(400).json({ error: sound })
-		} else if (sound == true) res.status(200).json({ message: 'ok' })
+			res.status(status).json({ error: sound })
+		} else if (sound == true) {
+			res.status(200).json({ message: 'ok' })
+		}
 		else res.status(500).json({ error: 'There was a server error try again' })
 	} catch (err) {
 		// If an error occurs, send a 500 response with 'error'
