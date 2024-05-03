@@ -39,6 +39,20 @@ let strip = ws281x(maxPixels, {
 })
 
 
+// Variables
+let pixels = strip.array
+let connected = false
+let classCode = ''
+let pollData = {}
+let boardIntervals = []
+let timerData = {
+	startTime: 0,
+	timeLeft: 0,
+	active: false,
+	sound: false
+}
+
+
 // Set Up
 // clear pixels
 fill(0x000000)
@@ -448,19 +462,46 @@ function getStringColumnLength(text) {
 	return (text.length * (PIXELS_PER_LETTER + 1))
 }
 
+/**
+ * This function plays a sound file based on the provided parameters.
+ *
+ * @param {Object} options - The options for playing sound.
+ * @param {string} options.bgm - The filename of the background music to play.
+ * @param {string} options.sfx - The filename of the sound effect to play.
+ * @returns {boolean|string} - Returns true if the sound file was played successfully, otherwise returns an error message.
+ */
+function playSound({ bgm, sfx }) {
+	// If neither bgm nor sfx is provided, return an error message
+	if (!bgm && !sfx) return 'Missing bgm or sfx'
+	// If both bgm and sfx are provided, return an error message
+	if (bgm && sfx) return 'You can not send both bgm and sfx'
 
-// Variables
-let pixels = strip.array
-let connected = false
-let classCode = ''
-let pollData = {}
-let textInterval = null
-let currentText = ''
-let timerData = {
-	startTime: 0,
-	timeLeft: 0,
-	active: false,
-	sound: false
+	// If bgm is provided
+	if (bgm) {
+		// Check if the bgm file exists
+		if (fs.existsSync(`./bgm/${bgm}`)) {
+			// If it exists, play the bgm
+			player.play(`./bgm/${bgm}`)
+			return true
+		} else {
+			// If it does not exist, return an error message
+			return `The background music ${bgm} does not exist.`
+		}
+	}
+	// If sfx is provided
+	if (sfx) {
+		// Check if the sfx file exists
+		if (fs.existsSync(`./sfx/${sfx}`)) {
+			// If it exists, play the sfx
+			player.play(`./sfx/${sfx}`)
+			return true
+		} else {
+			// If it does not exist, return an error message
+			return `The sound effect ${sfx} does not exist.`
+		}
+	}
+
+	return 'Unknown error'
 }
 
 
@@ -833,6 +874,26 @@ app.post('/api/say', (req, res) => {
 		res.status(200).json({ message: 'ok' })
 	} catch (err) {
 		// If an error occurs, send a 500 response with 'error'
+		res.status(500).json({ error: 'There was a server error try again' })
+	}
+})
+
+app.post('/api/playSound', (req, res) => {
+	try {
+		let { bgm, sfx } = req.query
+
+		let sound = playSound({ bgm, sfx })
+
+		if (typeof sound == 'string') {
+			let status = 400
+			if (sound.endsWith(' does not exist.')) status = 404
+
+			res.status(400).json({ error: sound })
+		} else if (sound == true) res.status(200).json({ message: 'ok' })
+		else res.status(500).json({ error: 'There was a server error try again' })
+	} catch (err) {
+		// If an error occurs, send a 500 response with 'error'
+		console.log(err);
 		res.status(500).json({ error: 'There was a server error try again' })
 	}
 })
