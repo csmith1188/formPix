@@ -17,7 +17,8 @@ const END_POINT_PERMISSIONS = {
 	'/api/gradient': 'lights',
 	'/api/setPixel': 'lights',
 	'/api/setPixels': 'lights',
-	'/api/say': 'lights'
+	'/api/say': 'lights',
+	'/api/playSound': 'sound'
 }
 
 
