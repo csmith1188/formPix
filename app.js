@@ -886,7 +886,7 @@ app.post('/api/say', (req, res) => {
 	}
 })
 
-app.post('/api/getSounds', (req, res) => {
+app.get('/api/getSounds', (req, res) => {
 	try {
 		let type = req.query.type
 
