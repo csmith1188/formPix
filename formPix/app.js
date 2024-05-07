@@ -3,7 +3,7 @@ const http = require('http');
 const express = require('express')
 const { io } = require('socket.io-client')
 const fs = require('fs')
-const { letters } = require('./letters.js')
+const { letters } = require('../letters.js')
 const util = require('util');
 const player = require('play-sound')({ player: 'omxplayer' })
 

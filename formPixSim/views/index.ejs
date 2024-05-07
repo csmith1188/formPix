@@ -1,0 +1,91 @@
+<html lang="en">
+
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Document</title>
+		<link rel="stylesheet" href="./css/style.css">
+		<script src="/socket.io/socket.io.js"></script>
+	</head>
+
+	<body>
+		<div id="main">
+			<div id="bar"> </div>
+			<div id="board"> </div>
+		</div>
+
+		<script>
+			// variables
+			let socket = io()
+			let config = JSON.parse('<%- JSON.stringify(config) %>')
+			const BOARD_WIDTH = Number('<%- BOARD_WIDTH%>')
+			const BOARD_HEIGHT = Number('<%- BOARD_HEIGHT%>')
+			let pixels = JSON.parse('<%- JSON.stringify(pixels) %>')
+			let barDiv = document.getElementById('bar')
+			let boardDiv = document.getElementById('board')
+			let audio = new Audio()
+
+			// functions
+			// This function converts a hexadecimal color value to an RGB color value.
+			function hexNumberToHexString(hex) {
+				// Shift the bits of the hex value 16 places to the right to get the red value.
+				let r = hex >> 16
+				// Shift the bits of the hex value 8 places to the right and bitwise AND with 0xff to get the green value.
+				let g = (hex >> 8) & 0xff
+				// Bitwise AND the hex value with 0xff to get the blue value.
+				let b = hex & 0xff
+
+				// Convert the red, green, and blue values to hexadecimal strings, pad them with zeros to ensure they are 2 characters long, and concatenate them with a '#' at the start to form the RGB color value.
+				return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+			}
+
+			function makePixel(id, color) {
+				let pixel = document.createElement('div')
+				pixel.id = `pixel${id}`
+				pixel.classList.add('pixel')
+				pixel.style.backgroundColor = hexNumberToHexString(color)
+				return pixel
+			}
+
+			for (let i = 0; i < config.barPixels; i++) {
+				let pixelElement = makePixel(i, pixels[i])
+				barDiv.appendChild(pixelElement)
+			}
+
+			for (let i = 0; i < config.boards * BOARD_WIDTH; i++) {
+				let column = document.createElement('div')
+				column.classList.add('column')
+				column.id
+
+				for (let j = 0; j < BOARD_HEIGHT; j++) {
+					let pixel = config.barPixels + i * BOARD_HEIGHT + j
+
+					if (i % 2 == 1) pixel = config.barPixels + i * BOARD_HEIGHT + BOARD_HEIGHT - 1 - j
+
+					let pixelElement = makePixel(pixel, pixels[pixel])
+					column.appendChild(pixelElement)
+				}
+
+				boardDiv.appendChild(column)
+			}
+
+			socket.on('render', (newPixels) => {
+				pixels = newPixels
+
+				for (let i = 0; i < pixels.length; i++) {
+					let pixelElement = document.getElementById(`pixel${i}`)
+
+					pixelElement.style.backgroundColor = hexNumberToHexString(pixels[i])
+				}
+			})
+
+			socket.on('play', (string) => {
+				console.log(string);
+
+				audio.src = string
+				audio.play()
+			})
+		</script>
+	</body>
+
+</html>
