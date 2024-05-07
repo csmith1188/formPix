@@ -3,7 +3,7 @@ const http = require('http');
 const express = require('express')
 const { io } = require('socket.io-client')
 const fs = require('fs')
-const { letters } = require('../letters.js')
+const { letters } = require('../letters')
 const util = require('util');
 const player = require('play-sound')({ player: 'omxplayer' })
 
@@ -1052,7 +1052,7 @@ socket.on('vbUpdate', (newPollData) => {
 		}
 
 		// If total students equals poll responses, play specific sounds and display messages based on the prompt
-		if (pollResponses == newPollData.totalResponders && !newPollData.multiRes) {
+		if (pollResponses == newPollData.totalResponders && pollResponses > 0 && !newPollData.multiRes) {
 			blind = false
 
 			if (newPollData.prompt == 'Thumbs?') {
@@ -1061,7 +1061,7 @@ socket.on('vbUpdate', (newPollData) => {
 
 				if (newPollData.polls.Up.responses == newPollData.totalResponders) {
 					gradient(0x0000FF, 0xFF0000, 0, config.barPixels)
-					let display = displayBoard('Max Gamer', 0xFF0000, 0x000000)
+					let display = displayBoard('Max Gamer', 0x00FF00, 0x000000)
 					if (!display) return
 					boardIntervals.push(display)
 					player.play('./sfx/sfx_success01.wav')
@@ -1069,6 +1069,17 @@ socket.on('vbUpdate', (newPollData) => {
 					return
 				} else if (newPollData.polls.Wiggle.responses == newPollData.totalResponders) {
 					player.play('./sfx/bruh.wav')
+
+					let text = [
+						'Wiggle Nation: Where democracy meets indecision!',
+						'Wiggle-o-mania: The cure for decision-making paralysis!'
+					]
+
+					text = text[Math.floor(Math.random() * text.length)]
+
+					let display = displayBoard(text, 0x00FFFF, 0x000000)
+					if (!display) return
+					boardIntervals.push(display)
 				} else if (newPollData.polls.Down.responses == newPollData.totalResponders) {
 					player.play('./sfx/wompwomp.wav')
 					let display = displayBoard('Git Gud', 0xFF0000, 0x000000)

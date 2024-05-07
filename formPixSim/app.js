@@ -5,7 +5,7 @@ const fs = require('fs')
 const util = require('util');
 // formPix - change io to io
 const io = require('socket.io-client')
-const { letters } = require('./letters.js')
+const { letters } = require('../letters.js')
 // formPix end
 
 
@@ -16,6 +16,7 @@ const webIo = require('socket.io')(httpServer)
 
 // Set EJS as our view engine
 app.set('view engine', 'ejs')
+app.set('views', __dirname + '/views')
 
 // Allows express to parse requests
 app.use(express.urlencoded({ extended: true }))
@@ -1071,7 +1072,7 @@ socket.on('vbUpdate', (newPollData) => {
 		}
 
 		// If total students equals poll responses, play specific sounds and display messages based on the prompt
-		if (pollResponses == newPollData.totalResponders && !newPollData.multiRes) {
+		if (pollResponses == newPollData.totalResponders && pollResponses > 0 && !newPollData.multiRes) {
 			blind = false
 
 			if (newPollData.prompt == 'Thumbs?') {
