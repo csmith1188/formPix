@@ -4,7 +4,6 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "start": "node formPix/app",
     "test": "node formPixSim/app",
     "dev": "nodemon formPixSim/app"
   },
