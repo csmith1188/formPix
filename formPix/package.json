@@ -1,0 +1,16 @@
+{
+  "name": "formPix",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "dev": "nodemon app",
+    "start": "node app"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "play-sound": "^1.1.6",
+    "rpi-ws281x-native": "^1.0.4"
+  }
+}
