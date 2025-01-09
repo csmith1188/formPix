@@ -1077,7 +1077,6 @@ socket.on('vbUpdate', (newPollData) => {
 
 			if (newPollData.prompt == 'Thumbs?') {
 				fill(0x000000, config.barPixels)
-				specialDisplay = true
 
 				if (newPollData.polls.Up.responses == newPollData.totalResponders) {
 					gradient(0x0000FF, 0xFF0000, 0, config.barPixels)
@@ -1085,6 +1084,8 @@ socket.on('vbUpdate', (newPollData) => {
 					if (!display) return
 					boardIntervals.push(display)
 					player.play('./sfx/sfx_success01.wav')
+
+					specialDisplay = true
 
 					return
 				} else if (newPollData.polls.Wiggle.responses == newPollData.totalResponders) {
@@ -1100,11 +1101,15 @@ socket.on('vbUpdate', (newPollData) => {
 					let display = displayBoard(text, 0x00FFFF, 0x000000)
 					if (!display) return
 					boardIntervals.push(display)
+
+					specialDisplay = true
 				} else if (newPollData.polls.Down.responses == newPollData.totalResponders) {
 					player.play('./sfx/wompwomp.wav')
 					let display = displayBoard('Git Gud', 0xFF0000, 0x000000)
 					if (!display) return
 					boardIntervals.push(display)
+
+					specialDisplay = true
 				}
 			}
 		}
