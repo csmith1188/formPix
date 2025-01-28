@@ -10,7 +10,7 @@ const { letters } = require('../letters.js')
 
 
 // Setup
-var app = express()
+const app = express()
 const httpServer = http.createServer(app)
 const webIo = require('socket.io')(httpServer)
 
@@ -81,7 +81,6 @@ const maxPixels = config.barPixels + config.boards * BOARD_WIDTH * BOARD_HEIGHT
 let pixels = new Uint32Array(maxPixels).fill(0x000000);
 // formPix
 let connected = false
-let classCode = ''
 let pollData = {}
 let boardIntervals = []
 let timerData = {
@@ -997,6 +996,9 @@ socket.on('connect', () => {
 	// Set the connected flag to true
 	connected = true
 
+	// Get active class from the api key
+	socket.emit('getActiveClass', config.api);
+
 	// Display the board with the IP address, white color, black background, and true for the clear flag
 	let display = displayBoard(config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000)
 	if (!display) return
@@ -1007,12 +1009,9 @@ socket.on('connect', () => {
 })
 
 // Listen for 'setClass' event from the socket
-socket.on('setClass', (userClass) => {
-	// If the userClass is 'noClass'
-	if (userClass == 'noClass') {
-		// Set classCode to an empty string
-		classCode = ''
-
+socket.on('setClass', (userClassId) => {
+	// If the userClassId is null
+	if (userClassId == null) {
 		// Clear the bar
 		fill(0x000000, 0, config.barPixels)
 
@@ -1023,13 +1022,11 @@ socket.on('setClass', (userClass) => {
 
 		ws281x.render()
 	} else {
-		// If the userClass is not 'noClass', set classCode to userClass
-		classCode = userClass
 		// Emit 'vbUpdate' event to the socket
 		socket.emit('vbUpdate')
 		socket.emit('vbTimer')
 	}
-	console.log('Moved to class:', userClass);
+	console.log('Moved to class id:', userClassId);
 })
 
 socket.on('vbUpdate', (newPollData) => {
