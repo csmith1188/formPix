@@ -44,7 +44,6 @@ let strip = ws281x(maxPixels, {
 // Variables
 let pixels = strip.array
 let connected = false
-let classCode = ''
 let pollData = {}
 let boardIntervals = []
 let timerData = {
@@ -987,14 +986,14 @@ socket.on('connect', () => {
 })
 
 // Listen for 'setClass' event from the socket
-socket.on('setClass', (userClass) => {
-	// If the userClass is 'noClass'
-	if (userClass == 'noClass') {
-		// Set classCode to an empty string
-		classCode = ''
-
+socket.on('setClass', (userClassId) => {
+	// If the userClassId is null
+	if (userClassId == null) {
 		// Clear the bar
 		fill(0x000000, 0, config.barPixels)
+
+		// Get active class from the api key
+		socket.emit('getActiveClass', config.api);
 
 		// Display the board with the specified parameters
 		let display = displayBoard(config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000)
@@ -1003,13 +1002,11 @@ socket.on('setClass', (userClass) => {
 
 		ws281x.render()
 	} else {
-		// If the userClass is not 'noClass', set classCode to userClass
-		classCode = userClass
 		// Emit 'vbUpdate' event to the socket
 		socket.emit('vbUpdate')
 		socket.emit('vbTimer')
 	}
-	console.log('Moved to class:', userClass);
+	console.log('Moved to class id:', userClassId);
 })
 
 socket.on('vbUpdate', (newPollData) => {
