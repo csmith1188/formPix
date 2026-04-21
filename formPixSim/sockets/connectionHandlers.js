@@ -62,10 +62,9 @@ function handleConnect(socket, boardIntervals) {
 		const { pixels, config, ws281x } = state;
 		let display = displayBoard(pixels, config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000, config, boardIntervals, ws281x, 0, null, 100)
 		if (!display) return
-		boardIntervals.push(display)
-		// Set timestamp for default message display
-		state.lastDisplayUpdate = new Date().toISOString();
-	}
+		boardIntervals.push(display)	
+	// Set timestamp for default message display
+	state.lastDisplayUpdate = new Date().toISOString();	}
 }
 
 /**
@@ -79,7 +78,6 @@ function handleRequestClassUpdate(socket) {
 	}
 }
 
-let lastClassId; // Move lastClassId outside the function
 
 /**
  * Get class info and send update message
@@ -94,7 +92,6 @@ function handleSetClass(socket, boardIntervals) {
 		if (userClassId == null) {
 			const { pixels, config, ws281x } = state;
 			fill(pixels, 0x000000, 0, config.barPixels)
-			lastClassId = null
 
 			logger.info('Formbar setClass: null - no active class, cleared display');
 
@@ -104,10 +101,7 @@ function handleSetClass(socket, boardIntervals) {
 
 			ws281x.render()
 		} else {
-			if (userClassId !== lastClassId) {
-				logger.info(`Formbar setClass: ${userClassId}`);
-				lastClassId = userClassId;
-			}
+			logger.debug(`Formbar setClass: ${userClassId}`);
 			socket.emit('classUpdate')
 			socket.emit('vbTimer')
 			handleRequestClassUpdate(socket)();

@@ -12,7 +12,6 @@
 			method: 'POST',
 			headers: {
 				'API': API_KEY,
-				'X-FormPix-Source': 'formbar',
 				'Content-Type': 'application/json'
 			}
 		};
@@ -23,7 +22,6 @@
 			method: 'GET',
 			headers: {
 				'API': API_KEY,
-				'X-FormPix-Source': 'formbar',
 				'Content-Type': 'application/json'
 			}
 		};

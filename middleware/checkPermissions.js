@@ -9,7 +9,7 @@ const logger = require('../utils/logger');
  */
 async function checkPermissions(req, res, next) {
 	try {
-		const { config, REQUIRED_PERMISSION, classId } = require('../state');
+		const { config, REQUIRED_PERMISSION, classId, permissionCache } = require('../state');
 		
 		let apiKey = req.headers.api
 
@@ -40,6 +40,21 @@ async function checkPermissions(req, res, next) {
 			return
 		}
 
+		// Allow trusted server-to-server formbar requests without remote permission checks.
+		if (apiKey === config.api) {
+			next()
+			return
+		}
+
+		const now = Date.now()
+		const cacheHit = permissionCache.apiKey === apiKey &&
+			permissionCache.classId === classId &&
+			permissionCache.expiresAt > now
+		if (cacheHit) {
+			next()
+			return
+		}
+
 		let response = await fetch(`${config.formbarUrl}/api/apiPermissionCheck?api=${apiKey}&permissionType=${REQUIRED_PERMISSION}&classId=${classId}`, {
 			method: 'GET',
 			headers: {
@@ -59,6 +74,10 @@ async function checkPermissions(req, res, next) {
 			res.status(response.status).json({ source: 'Formbar', message: response.statusText, data })
 			return
 		}
+
+		permissionCache.apiKey = apiKey
+		permissionCache.classId = classId
+		permissionCache.expiresAt = now + 10000
 
 		next()
 	} catch (err) {

@@ -506,6 +506,16 @@ async function setPixelsController(req, res) {
 	}
 }
 
+/**
+ * Stop any active progress animation
+ */
+function stopProgressAnimation() {
+	if (currentProgressInterval) {
+		clearInterval(currentProgressInterval);
+		currentProgressInterval = null;
+	}
+}
+
 module.exports = {
 	fillController,
 	fillByPercentController,
@@ -513,5 +523,6 @@ module.exports = {
 	setPixelController,
 	setPixelsController,
 	progressController,
-	currentProgressInterval
+	currentProgressInterval,
+	stopProgressAnimation
 };

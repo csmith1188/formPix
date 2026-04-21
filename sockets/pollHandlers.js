@@ -8,7 +8,6 @@ const { fill, gradient } = require('../utils/pixelOps');
 const { displayBoard, getStringColumnLength } = require('../utils/displayUtils');
 const { playSound, player } = require('../utils/soundUtils');
 const PIXELS_PER_LETTER = 5;
-const POLL_CLEAR_DEBOUNCE_MS = 1500;
 
 /**
  * @typedef {{ poll: Record<string, unknown> }} ClassroomData
@@ -32,26 +31,9 @@ function handleClassUpdate() {
 		if (util.isDeepStrictEqual(newPollData, pollData)) return
 
 		logger.debug('Class update received', { pollStatus: newPollData.status, pollPrompt: newPollData.prompt });
-		const pollIsVisible = !!(newPollData.status || (newPollData.responses && Object.keys(newPollData.responses).length > 0));
-		state.pollLockActive = pollIsVisible;
-		if (pollIsVisible) state.pollClearCandidateSince = null;
 
 		// Only clear the bar when poll is cleared (by the teacher), not when it's just ended
 		if (!newPollData.status && (!newPollData.responses || Object.keys(newPollData.responses).length === 0)) {
-			const now = Date.now();
-			if (!state.pollClearCandidateSince) {
-				state.pollClearCandidateSince = now;
-				state.pollData = newPollData;
-				return;
-			}
-
-			if (now - state.pollClearCandidateSince < POLL_CLEAR_DEBOUNCE_MS) {
-				state.pollData = newPollData;
-				return;
-			}
-
-			state.pollClearCandidateSince = null;
-			state.pollLockActive = false;
 			fill(pixels, 0x000000, 0, config.barPixels)
 
 			let display = displayBoard(pixels, config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000, config, boardIntervals, ws281x)
@@ -172,18 +154,22 @@ function handleClassUpdate() {
 					totalResponses += poll.responses
 				}
 
-				// Reserve one visible slot per responder so unanswered votes stay empty on the bar.
-				const totalVoteSlots = Number(newPollData.totalResponders) || 0
-				const dividerCount = totalVoteSlots > 0 ? totalVoteSlots - 1 : 0
-				const availablePixelsForResponses = Math.max(0, config.barPixels - dividerCount)
-				const pixelsPerStudent = totalVoteSlots > 0 ? Math.floor(availablePixelsForResponses / totalVoteSlots) : 0
-				let remainingVoteSlots = totalVoteSlots
+				// Reserve pixels for dividers (one between each response except the last)
+				const dividerCount = totalResponses > 0 ? totalResponses - 1 : 0
+				const availablePixelsForResponses = config.barPixels - dividerCount
+
+				if (newPollData.multiRes) {
+					if (newPollData.totalResponders <= 0) pixelsPerStudent = 0
+					else pixelsPerStudent = Math.floor(availablePixelsForResponses / totalResponses / newPollData.totalResponders)
+				} else {
+					if (newPollData.totalResponders <= 0) pixelsPerStudent = 0
+					else pixelsPerStudent = Math.floor(availablePixelsForResponses / totalResponses)
+				}
 
 				let currentPixel = 0
 				let pollNumber = 0
 				for (let poll of Object.values(newPollData.responses)) {
 					for (let responseNumber = 0; responseNumber < poll.responses; responseNumber++) {
-						if (remainingVoteSlots <= 0) break
 						let color = poll.color
 
 						if (blind) color = 0xFF8000
@@ -195,7 +181,6 @@ function handleClassUpdate() {
 						fill(pixels, color, currentPixel, pixelsToFill)
 
 						currentPixel += pixelsToFill
-						remainingVoteSlots--
 
 						const isLastResponse = responseNumber === poll.responses - 1 && pollNumber >= nonEmptyPolls
 						if (!blind && !isLastResponse) {
