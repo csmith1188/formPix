@@ -31,9 +31,12 @@ function handleClassUpdate() {
 		if (util.isDeepStrictEqual(newPollData, pollData)) return
 
 		logger.debug('Class update received', { pollStatus: newPollData.status, pollPrompt: newPollData.prompt });
+		const pollIsVisible = !!(newPollData.status || (newPollData.responses && Object.keys(newPollData.responses).length > 0));
+		state.pollLockActive = pollIsVisible;
 
 		// Only clear the bar when poll is cleared (by the teacher), not when it's just ended
 		if (!newPollData.status && (!newPollData.responses || Object.keys(newPollData.responses).length === 0)) {
+			state.pollLockActive = false;
 			fill(pixels, 0x000000, 0, config.barPixels)
 
 			let display = displayBoard(pixels, config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000, config, boardIntervals, ws281x)
@@ -154,22 +157,18 @@ function handleClassUpdate() {
 					totalResponses += poll.responses
 				}
 
-				// Reserve pixels for dividers (one between each response except the last)
-				const dividerCount = totalResponses > 0 ? totalResponses - 1 : 0
-				const availablePixelsForResponses = config.barPixels - dividerCount
-
-				if (newPollData.multiRes) {
-					if (newPollData.totalResponders <= 0) pixelsPerStudent = 0
-					else pixelsPerStudent = Math.floor(availablePixelsForResponses / totalResponses / newPollData.totalResponders)
-				} else {
-					if (newPollData.totalResponders <= 0) pixelsPerStudent = 0
-					else pixelsPerStudent = Math.floor(availablePixelsForResponses / totalResponses)
-				}
+				// Reserve one visible slot per responder so unanswered votes stay empty on the bar.
+				const totalVoteSlots = Number(newPollData.totalResponders) || 0
+				const dividerCount = totalVoteSlots > 0 ? totalVoteSlots - 1 : 0
+				const availablePixelsForResponses = Math.max(0, config.barPixels - dividerCount)
+				const pixelsPerStudent = totalVoteSlots > 0 ? Math.floor(availablePixelsForResponses / totalVoteSlots) : 0
+				let remainingVoteSlots = totalVoteSlots
 
 				let currentPixel = 0
 				let pollNumber = 0
 				for (let poll of Object.values(newPollData.responses)) {
 					for (let responseNumber = 0; responseNumber < poll.responses; responseNumber++) {
+						if (remainingVoteSlots <= 0) break
 						let color = poll.color
 
 						if (blind) color = 0xFF8000
@@ -181,6 +180,7 @@ function handleClassUpdate() {
 						fill(pixels, color, currentPixel, pixelsToFill)
 
 						currentPixel += pixelsToFill
+						remainingVoteSlots--
 
 						const isLastResponse = responseNumber === poll.responses - 1 && pollNumber >= nonEmptyPolls
 						if (!blind && !isLastResponse) {
