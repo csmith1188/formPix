@@ -10,6 +10,33 @@ const { playSound, player } = require('../utils/soundUtils');
 const PIXELS_PER_LETTER = 5;
 
 /**
+ * Stop active animations and clear the full display (bar + boards).
+ * @param {import('../state')} state - Global state object
+ */
+function stopAnimationsAndClearDisplay(state) {
+	const { pixels, ws281x, boardIntervals } = state
+	const raveController = require('../controllers/raveControllers')
+	const pixelControllers = require('../controllers/pixelControllers')
+
+	if (raveController.currentRaveInterval) {
+		clearInterval(raveController.currentRaveInterval)
+		raveController.currentRaveInterval = null
+	}
+
+	pixelControllers.stopProgressAnimation()
+
+	for (let boardInterval of boardIntervals) {
+		if (boardInterval && boardInterval.interval) {
+			clearInterval(boardInterval.interval)
+		}
+	}
+	boardIntervals.length = 0
+
+	fill(pixels, 0x000000, 0, pixels.length)
+	ws281x.render()
+}
+
+/**
  * @typedef {{ poll: Record<string, unknown> }} ClassroomData
  */
 
@@ -31,12 +58,19 @@ function handleClassUpdate() {
 		if (util.isDeepStrictEqual(newPollData, pollData)) return
 
 		logger.debug('Class update received', { pollStatus: newPollData.status, pollPrompt: newPollData.prompt });
+		const wasPollVisible = !!(pollData.status || (pollData.responses && Object.keys(pollData.responses).length > 0));
 		const pollIsVisible = !!(newPollData.status || (newPollData.responses && Object.keys(newPollData.responses).length > 0));
 		state.pollLockActive = pollIsVisible;
+
+		// On poll start, kill animations and clear the whole display first.
+		if (!wasPollVisible && pollIsVisible) {
+			stopAnimationsAndClearDisplay(state)
+		}
 
 		// Only clear the bar when poll is cleared (by the teacher), not when it's just ended
 		if (!newPollData.status && (!newPollData.responses || Object.keys(newPollData.responses).length === 0)) {
 			state.pollLockActive = false;
+			state.lastPollBoardRenderKey = null
 			fill(pixels, 0x000000, 0, config.barPixels)
 
 			let display = displayBoard(pixels, config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000, config, boardIntervals, ws281x)
@@ -198,16 +232,24 @@ function handleClassUpdate() {
 		if (!specialDisplay) {
 			text = `${newPollData.totalResponses}/${newPollData.totalResponders} `
 			if (newPollData.prompt) pollText = newPollData.prompt
+			const nextBoardRenderKey = `${text}|${pollText}`
+			const shouldRedrawBoard = state.lastPollBoardRenderKey !== nextBoardRenderKey || boardIntervals.length === 0
 
-			const boardStartPixel = config.barPixels
-			const boardLength = config.boards * 32 * 8
-			fill(pixels, 0x000000, boardStartPixel, boardLength)
+			if (shouldRedrawBoard) {
+				const boardStartPixel = config.barPixels
+				const boardLength = config.boards * 32 * 8
+				fill(pixels, 0x000000, boardStartPixel, boardLength)
 
-			let display = displayBoard(pixels, text, 0xFFFFFF, 0x000000, config, boardIntervals, ws281x)
-			if (display) boardIntervals.push(display)
+				let display = displayBoard(pixels, text, 0xFFFFFF, 0x000000, config, boardIntervals, ws281x)
+				if (display) boardIntervals.push(display)
 
-			display = displayBoard(pixels, pollText, 0xFFFFFF, 0x000000, config, boardIntervals, ws281x, getStringColumnLength(text))
-			if (display) boardIntervals.push(display)
+				display = displayBoard(pixels, pollText, 0xFFFFFF, 0x000000, config, boardIntervals, ws281x, getStringColumnLength(text))
+				if (display) boardIntervals.push(display)
+
+				state.lastPollBoardRenderKey = nextBoardRenderKey
+			}
+		} else {
+			state.lastPollBoardRenderKey = null
 		}
 
 		state.pollData = newPollData
