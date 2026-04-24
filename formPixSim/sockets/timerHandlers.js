@@ -21,6 +21,7 @@ function handleVBTimer() {
 		
 		if (!newTimerData) return
 
+		// Handle timer deactivation: clear bar if it was active
 		if (!newTimerData.active) {
 			if (state.timerData.active) {
 				logger.info('Timer ended');
@@ -38,10 +39,12 @@ function handleVBTimer() {
 		logger.debug(`Formbar vbTimer: timeLeft=${newTimerData.timeLeft}s / ${newTimerData.startTime}s`);
 
 		if (newTimerData.timeLeft > 0) {
+			// Calculate pixels to fill based on remaining time ratio
 			let timeLeftPixels = Math.round(config.barPixels * (newTimerData.timeLeft / newTimerData.startTime))
 			fill(pixels, 0x0000ff, 0, timeLeftPixels)
 			fill(pixels, 0xffffff, timeLeftPixels, config.barPixels - timeLeftPixels)
 		} else {
+			// Time is up: fill bar with red
 			fill(pixels, 0xff0000, 0, config.barPixels)
 		}
 

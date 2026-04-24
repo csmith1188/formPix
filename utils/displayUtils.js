@@ -23,6 +23,7 @@ function showString(boardPixels, startFrame, textColor, backgroundColor, pixels,
 	let currentColumn = startFrame;
 	const maxColumns = boardPixels.length;
 
+	// Render pixel columns starting from startFrame, wrapping around if needed
 	for (let i = 0; i < maxColumns; i++) {
 		const colIndex = currentColumn;
 		const col = boardPixels[colIndex];
@@ -46,6 +47,7 @@ function showString(boardPixels, startFrame, textColor, backgroundColor, pixels,
  * @returns {number} The amount of columns in the string.
  */
 function getStringColumnLength(text) {
+	// Each letter takes PIXELS_PER_LETTER columns plus one for spacing
 	return (text.length * (PIXELS_PER_LETTER + 1))
 }
 
