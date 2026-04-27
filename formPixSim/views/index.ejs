@@ -47,11 +47,13 @@
 				return pixel
 			}
 
+			// Create pixel elements for the bar
 			for (let i = 0; i < config.barPixels; i++) {
 				let pixelElement = makePixel(i, pixels[i])
 				barDiv.appendChild(pixelElement)
 			}
 
+			// Create pixel elements for the board, with zigzag column layout
 			for (let i = 0; i < config.boards * BOARD_WIDTH; i++) {
 				let column = document.createElement('div')
 				column.classList.add('column')
@@ -79,6 +81,7 @@
 				}
 			})
 
+			// Handle sound playback events
 			socket.on('play', (data) => {
 				// data can be a plain string (legacy socket sounds) or { path, volume }
 				const soundPath = typeof data === 'object' ? data.path : data;

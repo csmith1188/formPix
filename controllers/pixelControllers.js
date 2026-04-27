@@ -38,6 +38,7 @@ function percentageController(req, res) {
 			res.status(400).json({ error: 'percent must be a number between 0 and 100' })
 			return
 		}
+		// Calculate the number of pixels to fill based on percentage
 		let length = Math.floor((percent / 100) * pixels.length)
 		fill(pixels, color, 0, length)
 		ws281x.render()
@@ -73,6 +74,7 @@ async function progressController(req, res) {
 			interval = 50
 		} = req.query;
 
+		// Set default colors if not provided
 		if (!bg1) {
 			bg1 = '#000000';
 		}
@@ -177,6 +179,7 @@ function animateProgress(start, length, startingFill, duration, interval, bg1, b
 	const fgGradientColors = [];
 	const stepColor = length > 1 ? fg1Rgb.map((c, i) => (fg2Rgb[i] - c) / (length - 1)) : [0, 0, 0];
 
+	// Pre-calculate gradient colors for the foreground fill
 	for (let i = 0; i < length; i++) {
 		fgGradientColors[i] = rgbToHex([
 			Math.round(fg1Rgb[0] + stepColor[0] * i),
@@ -333,6 +336,7 @@ async function fillController(req, res) {
 		length = Number(length)
 
 		const barLength = config.barPixels;
+		// Ensure start and length are within bounds
 		if (start < 0) start = 0;
 		if (start >= barLength) {
 			res.status(400).json({ error: 'start must be within barPixels' });
@@ -458,6 +462,7 @@ async function setPixelsController(req, res) {
 		const { safeJsonParse } = require('../utils/colorUtils');
 
 		let inputPixels = req.query.pixels
+		// Create a copy of pixels to validate all changes before applying
 		let tempPixels = structuredClone(pixels)
 
 		if (!inputPixels) {
