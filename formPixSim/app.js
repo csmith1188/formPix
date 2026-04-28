@@ -161,47 +161,6 @@ socket.on('classUpdate', handleClassUpdate(webIo));
 socket.on('vbTimer', handleVBTimer());
 
 // ============================================================================
-// SQL SETUP
-// ============================================================================
-const dbDir = path.join(__dirname, 'data');
-if (!fs.existsSync(dbDir)) {
-	fs.mkdirSync(dbDir, { recursive: true });
-}
-
-const dbPath = state.config.sqlitePath
-	? path.resolve(state.config.sqlitePath)
-	: path.join(dbDir, 'formpix.db');
-
-state.db = new sqlite3.Database(dbPath, (err) => {
-	if (err) {
-		console.error('SQLite connection failed:', err.message);
-		return;
-	}
-	console.log(`SQLite connected: ${dbPath}`);
-});
-
-state.db.serialize(() => {
-	state.db.run(`
-		CREATE TABLE IF NOT EXISTS submissions (
-			entry INTEGER PRIMARY KEY AUTOINCREMENT,
-			id NOT NULL,
-			email TEXT NOT NULL,
-			text TEXT NOT NULL
-		)
-	`);
-});
-
-const closeDb = () => {
-	if (state.db) {
-		state.db.close((err) => {
-			if (err) console.error('SQLite close failed:', err.message);
-		});
-	}
-};
-
-process.on('beforeExit', closeDb);
-
-// ============================================================================
 // SERVER START
 // ============================================================================
 

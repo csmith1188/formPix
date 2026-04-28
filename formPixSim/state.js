@@ -27,7 +27,7 @@ function getMockStripType(_target, key) {
  * No-op render function used by simulator state before app wires websocket rendering.
  * @returns {void}
  */
-function noopRender() {}
+function noopRender() { }
 
 // Mock rpi-ws281x-native for the simulator environment
 const ws281x = Object.assign(
@@ -46,15 +46,15 @@ env.config();
 
 // Load config from the .env
 const config = {
-    formbarUrl: process.env.formbarUrl || '',
-    api: process.env.api || '',
-    brightness: parseInt(process.env.brightness) || 0,
-    pin: parseInt(process.env.pin) || 0,
-    stripType: process.env.stripType || 'WS2812',
-    barPixels: parseInt(process.env.barPixels) || 0,
-    boards: parseInt(process.env.boards) || 0,
-    port: parseInt(process.env.port) || 421,
-    irPin: process.env.irPin ? parseInt(process.env.irPin) : -1
+	formbarUrl: process.env.formbarUrl || '',
+	api: process.env.api || '',
+	brightness: parseInt(process.env.brightness) || 0,
+	pin: parseInt(process.env.pin) || 0,
+	stripType: process.env.stripType || 'WS2812',
+	barPixels: parseInt(process.env.barPixels) || 0,
+	boards: parseInt(process.env.boards) || 0,
+	port: parseInt(process.env.port) || 421,
+	irPin: process.env.irPin ? parseInt(process.env.irPin) : -1
 };
 
 // Constants

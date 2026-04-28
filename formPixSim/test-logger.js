@@ -11,22 +11,17 @@ logger.info('Testing INFO level - Server startup simulation', { port: 3000, stat
 
 logger.warn('Testing WARN level - Missing optional parameter', { param: 'backgroundColor', default: '#000000' });
 
-logger.error('Testing ERROR level - Simulated error', { 
-    error: 'Database connection failed', 
-    stack: 'Error: Connection timeout\n    at Database.connect (db.js:45)\n    at Server.start (app.js:12)' 
-});
-
-logger.debug('Testing DEBUG level - Detailed operation info', { 
-    operation: 'pixelUpdate', 
-    pixelCount: 256, 
-    color: 'FF0000' 
+logger.debug('Testing DEBUG level - Detailed operation info', {
+    operation: 'pixelUpdate',
+    pixelCount: 256,
+    color: 'FF0000'
 });
 
 // Test successful operation logging
-logger.info('Testing successful operation', { 
-    endpoint: '/api/fill', 
-    color: 'FFFFFF', 
-    duration: '15ms' 
+logger.info('Testing successful operation', {
+    endpoint: '/api/fill',
+    color: 'FFFFFF',
+    duration: '15ms'
 });
 
 // Test error with actual Error object

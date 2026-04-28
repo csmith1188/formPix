@@ -84,12 +84,14 @@ function handleClassUpdate(webIo) {
 		if (!newPollData.status && (!newPollData.responses || Object.keys(newPollData.responses).length === 0)) {
 			state.pollLockActive = false;
 			state.lastPollBoardRenderKey = null
-			fill(pixels, 0x000000, 0, config.barPixels)
+			if (wasPollVisible) {
+				fill(pixels, 0x000000, 0, config.barPixels)
 
-			let display = displayBoard(pixels, config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000, config, boardIntervals, ws281x)
-			if (display) {
-				boardIntervals.push(display)
-				ws281x.render()
+				let display = displayBoard(pixels, config.formbarUrl.split('://')[1], 0xFFFFFF, 0x000000, config, boardIntervals, ws281x)
+				if (display) {
+					boardIntervals.push(display)
+					ws281x.render()
+				}
 			}
 
 			state.pollData = newPollData
@@ -151,7 +153,7 @@ function handleClassUpdate(webIo) {
 						}
 
 						const upResponses = findResponse('Up')
-						if (upResponses && upResponses.responses == newPollData.totalResponders) {
+						if (upResponses && upResponses.responses == newPollData.totalResponders && newPollData.totalResponders > 0) {
 							gradient(pixels, 0x0000FF, 0xFF0000, 0, config.barPixels)
 							let text = ['Max Gamer', 'Skibidi Rizz!']
 							let display = displayBoard(pixels, text[Math.floor(Math.random() * text.length)], 0x00FF00, 0x000000, config, boardIntervals, ws281x)
@@ -248,20 +250,35 @@ function handleClassUpdate(webIo) {
 				}
 
 				if (!specialDisplay) {
-					text = `${newPollData.totalResponses}/${newPollData.totalResponders} `
+					const calculatedTotalResponses = Object.values(newPollData.responses || {}).reduce((sum, poll) => {
+						return sum + (Number(poll.responses) || 0)
+					}, 0)
+					const normalizedTotalResponses = Number.isFinite(Number(newPollData.totalResponses))
+						? Number(newPollData.totalResponses)
+						: calculatedTotalResponses
+					const normalizedTotalResponders = Number.isFinite(Number(newPollData.totalResponders))
+						? Number(newPollData.totalResponders)
+						: Number(pollData.totalResponders) || calculatedTotalResponses
+
+					text = `${normalizedTotalResponses}/${normalizedTotalResponders} `
 					if (newPollData.prompt) pollText = newPollData.prompt
 					const nextBoardRenderKey = `${text}|${pollText}`
-					const shouldRedrawBoard = state.lastPollBoardRenderKey !== nextBoardRenderKey || boardIntervals.length === 0
+					const counterColumns = getStringColumnLength(text)
+					let display = displayBoard(pixels, text, 0xFFFFFF, 0x000000, config, boardIntervals, ws281x)
+					if (display) boardIntervals.push(display)
+
+					const hasPollPromptDisplay = boardIntervals.some((boardInterval) => {
+						return boardInterval
+							&& boardInterval.string === pollText
+							&& boardInterval.startColumn === counterColumns
+					})
+					const shouldRedrawBoard =
+						state.lastPollBoardRenderKey !== nextBoardRenderKey
+						|| boardIntervals.length === 0
+						|| !hasPollPromptDisplay
 
 					if (shouldRedrawBoard) {
-						const boardStartPixel = config.barPixels
-						const boardLength = config.boards * 32 * 8
-						fill(pixels, 0x000000, boardStartPixel, boardLength)
-
-						let display = displayBoard(pixels, text, 0xFFFFFF, 0x000000, config, boardIntervals, ws281x)
-						if (display) boardIntervals.push(display)
-
-						display = displayBoard(pixels, pollText, 0xFFFFFF, 0x000000, config, boardIntervals, ws281x, getStringColumnLength(text))
+						display = displayBoard(pixels, pollText, 0xFFFFFF, 0x000000, config, boardIntervals, ws281x, counterColumns)
 						if (display) boardIntervals.push(display)
 
 						state.lastPollBoardRenderKey = nextBoardRenderKey
