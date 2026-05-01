@@ -10,7 +10,11 @@ let rpio;
 try {
     rpio = require('rpio');
 } catch (err) {
-    parentPort.postMessage({ type: 'error', message: 'rpio not available' });
+    const detail = err && err.message ? err.message : String(err);
+    parentPort.postMessage({
+        type: 'error',
+        message: `rpio failed to load (${detail}). GPIO IR only works on Raspberry Pi with rpio installed; use irPin=-1 in .env to disable.`
+    });
     process.exit(1);
 }
 

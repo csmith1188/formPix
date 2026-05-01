@@ -7,6 +7,7 @@
 
 const { Worker } = require('worker_threads');
 const path = require('path');
+const state = require('../state');
 
 // IR button codes (hex values)
 const BUTTONS = {
@@ -93,6 +94,16 @@ class IRRemote {
         this.pin = parsedPin;
 
         try {
+            try {
+                require.resolve('rpio');
+            } catch {
+                console.warn(
+                    '[IR Remote] Disabled: rpio is not installed (skipped optional dependency or wrong platform). ' +
+                    'On a Raspberry Pi run `npm install`. Set irPin=-1 in .env to silence this.'
+                );
+                return false;
+            }
+
             this.worker = new Worker(path.join(__dirname, 'irWorker.js'), {
                 workerData: { pin: this.pin }
             });
@@ -168,36 +179,36 @@ class IRRemote {
         const preset = POLL_PRESETS[buttonName];
 
         if (preset) {
-            const textBox = preset.type === 1 ? 1 : 0;
             try {
-                // Formbar startPoll params (individual args, not array):
-                // responseNumber, responseTextBox, pollPrompt, polls,
-                // blind, weight, tags, boxes, indeterminate,
-                // lastResponse, multiRes, allowVoteChanges
-                this.socket.emit('startPoll',
-                    preset.answers.length,  // responseNumber
-                    textBox,                // responseTextBox
-                    preset.title,           // pollPrompt
-                    preset.answers,         // polls: PollOptions[]
-                    false,                  // blind
-                    1,                      // weight
-                    [],                     // tags
-                    [],                     // boxes
-                    [],                     // indeterminate
-                    [],                     // lastResponse
-                    false,                  // multiRes
-                    false                   // allowVoteChanges
-                );
+                // Object form (preferred): matches formbar startPoll API
+                this.socket.emit('startPoll', {
+                    prompt: preset.title,
+                    answers: preset.answers,
+                    blind: false,
+                    weight: 1,
+                    tags: [],
+                    excludedRespondents: [],
+                    indeterminate: [],
+                    allowVoteChanges: true,
+                    allowTextResponses: preset.type === 1,
+                    allowMultipleResponses: true
+                });
                 console.log(`[IR Remote] Started poll: ${preset.title}`);
             } catch (err) {
                 console.error('[IR Remote] Failed to emit "startPoll":', err);
             }
         } else if (buttonName === 'play_pause') {
             try {
-                this.socket.emit('startPoll');
-                console.log('[IR Remote] Started poll');
+                const pollEnded = state.pollData && state.pollData.status === false;
+                if (pollEnded) {
+                    this.socket.emit('updatePoll', {});
+                    console.log('[IR Remote] updatePoll {} (poll already ended)');
+                } else {
+                    this.socket.emit('updatePoll', { status: false });
+                    console.log('[IR Remote] updatePoll { status: false } (end poll)');
+                }
             } catch (err) {
-                console.error('[IR Remote] Failed to emit "startPoll":', err);
+                console.error('[IR Remote] Failed to emit "updatePoll":', err);
             }
         }
     }

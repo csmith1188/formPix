@@ -14,14 +14,15 @@
     "dotenv": "^16.4.5",
     "ejs": "^4.0.1",
     "express": "^4.21.2",
-    "onoff": "^6.3.0",
+    "onoff": "^6.0.3",
     "play-sound": "^1.1.6",
     "rpi-ws281x-native": "^1.0.4",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1"
   },
   "optionalDependencies": {
-    "pigpio": "^3.3.1"
+    "pigpio": "^3.3.1",
+    "rpio": "^2.4.2"
   },
   "devDependencies": {
     "nodemon": "^2.0.0"
