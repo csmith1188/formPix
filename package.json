@@ -17,7 +17,6 @@
     "onoff": "^6.3.0",
     "play-sound": "^1.1.6",
     "rpi-ws281x-native": "^1.0.4",
-    "sqlite3": "^5.1.7",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1"
   },
