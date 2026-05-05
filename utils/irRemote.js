@@ -80,6 +80,22 @@ class IRRemote {
         this.debounceMs = 200;
         this.running = false;
         this.worker = null;
+        this._disabledAfterFailure = false;
+    }
+
+    /**
+     * Log failure, stop the worker, and drop off global state so IR stays off until restart.
+     */
+    _disableAfterFailure(reason) {
+        if (this._disabledAfterFailure) {
+            return;
+        }
+        this._disabledAfterFailure = true;
+        console.error(`[IR Remote] ${reason} — IR remote disabled (restart app to re-enable)`);
+        this.stop();
+        if (state.irRemote === this) {
+            state.irRemote = null;
+        }
     }
 
     /**
@@ -105,7 +121,10 @@ class IRRemote {
             }
 
             this.worker = new Worker(path.join(__dirname, 'irWorker.js'), {
-                workerData: { pin: this.pin }
+                workerData: {
+                    pin: this.pin,
+                    verbose: process.env.IR_VERBOSE === '1' || process.env.IR_VERBOSE === 'true'
+                }
             });
 
             this.worker.on('message', (msg) => {
@@ -113,7 +132,7 @@ class IRRemote {
                     this.running = true;
                     console.log(`[IR Remote] Listening on GPIO pin ${msg.pin}`);
                 } else if (msg.type === 'error') {
-                    console.error(`[IR Remote] Worker error: ${msg.message}`);
+                    this._disableAfterFailure(`Worker error: ${msg.message}`);
                 } else if (msg.type === 'debug') {
                     console.log(`[IR Remote] ${msg.message}`);
                 } else if (msg.type === 'signal') {
@@ -122,15 +141,14 @@ class IRRemote {
             });
 
             this.worker.on('error', (err) => {
-                console.error(`[IR Remote] Worker crashed: ${err.message}`);
-                this.running = false;
+                this._disableAfterFailure(`Worker crashed: ${err.message}`);
             });
 
             this.worker.on('exit', (code) => {
-                if (code !== 0) {
-                    console.error(`[IR Remote] Worker exited with code ${code}`);
-                }
                 this.running = false;
+                if (code !== 0) {
+                    this._disableAfterFailure(`Worker exited with code ${code}`);
+                }
             });
 
             return true;
@@ -144,8 +162,12 @@ class IRRemote {
      * Handle a decoded IR signal from the worker
      */
     _handleSignal(binarySignal) {
+        if (this._disabledAfterFailure) {
+            return;
+        }
+
         const hexSignal = '0x' + binarySignal.toString(16);
-        console.log(`[IR Remote] Received: ${hexSignal}`);
+        console.log(`[IR Remote] Decoded signal: ${hexSignal}`);
 
         // Debounce
         const now = Date.now();
@@ -164,7 +186,7 @@ class IRRemote {
             }
         }
 
-        console.log(`[IR Remote] Unknown code: ${hexSignal}`);
+        console.log(`[IR Remote] Unknown code (ignored): ${hexSignal}`);
     }
 
     /**
@@ -172,7 +194,7 @@ class IRRemote {
      */
     executeAction(buttonName) {
         if (!this.socket || !this.socket.connected) {
-            console.log('[IR Remote] Socket not connected - cannot execute action');
+            this._disableAfterFailure('Socket not connected; cannot send Formbar request from IR');
             return;
         }
 
@@ -193,22 +215,26 @@ class IRRemote {
                     allowTextResponses: preset.type === 1,
                     allowMultipleResponses: true
                 });
-                console.log(`[IR Remote] Started poll: ${preset.title}`);
+                console.log(
+                    `[IR Remote] OK — sent startPoll request to Formbar (${preset.title}, button ${buttonName})`
+                );
             } catch (err) {
-                console.error('[IR Remote] Failed to emit "startPoll":', err);
+                const detail = err && err.message ? err.message : String(err);
+                this._disableAfterFailure(`startPoll emit failed: ${detail}`);
             }
         } else if (buttonName === 'play_pause') {
             try {
                 const pollEnded = state.pollData && state.pollData.status === false;
                 if (pollEnded) {
                     this.socket.emit('updatePoll', {});
-                    console.log('[IR Remote] updatePoll {} (poll already ended)');
+                    console.log('[IR Remote] OK — sent updatePoll {} to Formbar (poll already ended)');
                 } else {
                     this.socket.emit('updatePoll', { status: false });
-                    console.log('[IR Remote] updatePoll { status: false } (end poll)');
+                    console.log('[IR Remote] OK — sent updatePoll { status: false } to Formbar (end poll)');
                 }
             } catch (err) {
-                console.error('[IR Remote] Failed to emit "updatePoll":', err);
+                const detail = err && err.message ? err.message : String(err);
+                this._disableAfterFailure(`updatePoll emit failed: ${detail}`);
             }
         }
     }
@@ -220,6 +246,7 @@ class IRRemote {
         this.running = false;
 
         if (this.worker) {
+            this.worker.removeAllListeners();
             this.worker.terminate();
             this.worker = null;
         }
