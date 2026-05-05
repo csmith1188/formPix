@@ -111,8 +111,9 @@ httpServer.listen(state.config.port, () => {
 	// Set irPin to -1 in .env to disable IR remote
 	if (state.config.irPin !== -1) {
 		const irRemote = new IRRemote(socket, state.config.irPin);
-		irRemote.start();
-		state.irRemote = irRemote;
+		if (irRemote.start()) {
+			state.irRemote = irRemote;
+		}
 	}
 
 	// Gracefully stop IR Remote on process shutdown to cleanup GPIO

@@ -19,6 +19,7 @@ try {
 }
 
 const pin = workerData.pin || 27;
+const verbose = Boolean(workerData && workerData.verbose);
 
 try {
     rpio.init({ gpiomem: true, mapping: 'gpio' });
@@ -49,8 +50,9 @@ function getBinary() {
         return null;
     }
 
-    // Pin went LOW — IR signal detected
-    parentPort.postMessage({ type: 'debug', message: 'Signal start detected (pin went LOW)' });
+    if (verbose) {
+        parentPort.postMessage({ type: 'debug', message: 'Signal start detected (pin went LOW)' });
+    }
 
     const pulses = [];
     const startTime = timeNow();
@@ -70,7 +72,9 @@ function getBinary() {
         rpio.usleep(10);
     }
 
-    parentPort.postMessage({ type: 'debug', message: `Captured ${pulses.length} pulses` });
+    if (verbose) {
+        parentPort.postMessage({ type: 'debug', message: `Captured ${pulses.length} pulses` });
+    }
 
     if (pulses.length < 33) {
         return null;
@@ -83,20 +87,24 @@ function getBinary() {
     }
 
     if (binary.length !== 32) {
-        parentPort.postMessage({ type: 'debug', message: `Bad binary length: ${binary.length}` });
+        if (verbose) {
+            parentPort.postMessage({ type: 'debug', message: `Bad binary length: ${binary.length}` });
+        }
         return null;
     }
 
     try {
         const code = parseInt(binary, 2);
-        parentPort.postMessage({ type: 'debug', message: `Decoded: 0x${code.toString(16)}` });
+        if (verbose) {
+            parentPort.postMessage({ type: 'debug', message: `Decoded: 0x${code.toString(16)}` });
+        }
         return code;
     } catch (err) {
         return null;
     }
 }
 
-// Main loop — uses setInterval so the worker event loop can flush messages
+// Main loop — setImmediate keeps the worker event loop free to flush messages
 function irLoop() {
     const signal = getBinary();
     if (signal !== null) {
@@ -106,27 +114,8 @@ function irLoop() {
     setImmediate(irLoop);
 }
 
-parentPort.postMessage({ type: 'debug', message: `Pin ${pin} initial read: ${rpio.read(pin)}` });
-
-// First: raw pin test for 10 seconds to verify rpio can see pin changes
-parentPort.postMessage({ type: 'debug', message: 'Running raw pin test for 10 seconds - press a button now...' });
-let lastVal = rpio.read(pin);
-let changes = 0;
-const testEnd = timeNow() + 10;
-
-while (timeNow() < testEnd) {
-    const val = rpio.read(pin);
-    if (val !== lastVal) {
-        changes++;
-        if (changes <= 10) {
-            parentPort.postMessage({ type: 'debug', message: `Pin changed to ${val} (change #${changes})` });
-        }
-        lastVal = val;
-    }
-    rpio.usleep(10);
+if (verbose) {
+    parentPort.postMessage({ type: 'debug', message: `Pin ${pin} initial read: ${rpio.read(pin)}` });
 }
 
-parentPort.postMessage({ type: 'debug', message: `Raw pin test done. Total changes detected: ${changes}` });
-
-// Now start the normal IR loop
 setImmediate(irLoop);
