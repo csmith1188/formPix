@@ -27,6 +27,7 @@ function handleConnectError(socket, boardIntervals) {
 
 		state.connected = false
 
+		// Clear all active display intervals on disconnect
 		boardIntervals = boardIntervals.filter(boardInterval => {
 			clearInterval(boardInterval.interval);
 			return false
@@ -53,6 +54,7 @@ function handleConnect(socket, boardIntervals) {
 
 		state.connected = true
 
+		// Request the active class from the server
 		socket.emit('getActiveClass', state.config.api);
 
 		const { pixels, config, ws281x } = state;
@@ -86,6 +88,7 @@ function handleSetClass(socket, boardIntervals) {
 	return (userClassId) => {
 		state.connected = true
 
+		// Handle case when no class is active
 		if (userClassId == null) {
 			const { pixels, config, ws281x } = state;
 			state.pollLockActive = false
@@ -101,6 +104,7 @@ function handleSetClass(socket, boardIntervals) {
 
 			ws281x.render()
 		} else {
+			// New class is active: request updates for class and timer
 			logger.debug(`Class update received - New class ID: ${userClassId}`);
 			socket.emit('classUpdate')
 			socket.emit('vbTimer')

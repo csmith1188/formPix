@@ -21,6 +21,7 @@ async function checkPermissions(req, res, next) {
 
 		let urlPath = req.url
 
+		// Clean up URL path by removing query parameters and trailing slash
 		if (urlPath.indexOf('?') != -1) {
 			urlPath = urlPath.slice(0, urlPath.indexOf('?'))
 		}
@@ -46,6 +47,7 @@ async function checkPermissions(req, res, next) {
 			return
 		}
 
+		// Check permission cache to avoid repeated API calls
 		const now = Date.now()
 		const cacheHit = permissionCache.apiKey === apiKey &&
 			permissionCache.classId === classId &&
@@ -55,6 +57,7 @@ async function checkPermissions(req, res, next) {
 			return
 		}
 
+		// Verify API key permissions with the Formbar service
 		let response = await fetch(`${config.formbarUrl}/api/apiPermissionCheck?api=${apiKey}&permissionType=${REQUIRED_PERMISSION}&classId=${classId}`, {
 			method: 'GET',
 			headers: {
@@ -75,6 +78,7 @@ async function checkPermissions(req, res, next) {
 			return
 		}
 
+		// Cache successful permission check for 10 seconds
 		permissionCache.apiKey = apiKey
 		permissionCache.classId = classId
 		permissionCache.expiresAt = now + 10000

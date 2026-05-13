@@ -76,6 +76,9 @@ let state = {
 	pollLockActive: false,
 	boardIntervals: [],
 	currentDisplayMessage: null,
+	lastDisplayUpdate: null,
+	lastDisplaySentById: null,
+	lastDisplaySentByEmail: null,
 	timerData: {
 		startTime: 0,
 		timeLeft: 0,

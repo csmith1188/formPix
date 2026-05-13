@@ -121,6 +121,7 @@ function handleClassUpdate() {
 				if (pollResponses == newPollData.totalResponders && pollResponses > 0 && !newPollData.multiRes) {
 					blind = false
 
+					// Special handling for "Thumbs?" polls with unanimous responses
 					if (newPollData.prompt == 'Thumbs?') {
 						fill(pixels, 0x000000, config.barPixels)
 
@@ -200,6 +201,7 @@ function handleClassUpdate() {
 				const pixelsPerStudent = totalVoteSlots > 0 ? Math.floor(availablePixelsForResponses / totalVoteSlots) : 0
 				let remainingVoteSlots = totalVoteSlots
 
+				// Fill the bar with response colors, one pixel per vote
 				let currentPixel = 0
 				let pollNumber = 0
 				for (let poll of Object.values(newPollData.responses)) {
@@ -259,6 +261,7 @@ function handleClassUpdate() {
 				|| boardIntervals.length === 0
 				|| !hasPollPromptDisplay
 
+			// Display poll stats and prompt on the board
 			if (shouldRedrawBoard) {
 				display = displayBoard(pixels, pollText, 0xFFFFFF, 0x000000, config, boardIntervals, ws281x, counterColumns)
 				if (display) boardIntervals.push(display)

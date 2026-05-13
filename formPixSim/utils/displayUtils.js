@@ -19,6 +19,7 @@ function getBoardPixelsForString(string) {
 	if (cached) return cached;
 
 	const builtPixels = [Array(8).fill(0)];
+	// Build pixel columns for each letter, adding spacing between letters
 	for (let letter of string) {
 		if (!letters[letter]) continue;
 
@@ -58,6 +59,7 @@ function showString(boardPixels, startFrame, textColor, backgroundColor, pixels,
 
 	fill(pixels, 0x000000, startPixel, endPixel - startPixel);
 
+	// Render columns starting from startFrame, wrapping around if needed
 	for (let i = 0; i < maxColumns; i++) {
 		let col = boardPixels[currentColumn];
 		const useReversed = (startFrame % 2) === (currentColumn % 2);
@@ -113,6 +115,7 @@ function displayBoard(pixels, string, textColor, backgroundColor, config, boardI
 	let boardPixels = [Array(8).fill(0)];
 	const isStaticDisplay = stringColumnLength <= endColumn - startColumn;
 
+	// Check if this display is already active
 	for (let boardInterval of boardIntervals) {
 		if (!boardInterval) continue
 
@@ -166,6 +169,7 @@ function displayBoard(pixels, string, textColor, backgroundColor, config, boardI
 			scroll
 		}
 	} else {
+		// Text is longer than display area: set up scrolling
 		for (let i = 0; i < 2 * 6 + 1; i++) {
 			boardPixels.unshift([0, 0, 0, 0, 0, 0, 0, 0]);
 		}

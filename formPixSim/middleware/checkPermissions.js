@@ -25,6 +25,7 @@ async function checkPermissions(req, res, next) {
 
 		let urlPath = req.url
 
+		// Clean up URL path by removing query parameters and trailing slash
 		if (urlPath.indexOf('?') != -1) {
 			urlPath = urlPath.slice(0, urlPath.indexOf('?'))
 		}
@@ -43,6 +44,7 @@ async function checkPermissions(req, res, next) {
 			return
 		}
 
+		// Verify API key permissions with the Formbar service
 		let response = await fetch(`${config.formbarUrl}/api/apiPermissionCheck?api=${apiKey}&permissionType=${REQUIRED_PERMISSION}&classId=${classId}`, {
 			method: 'GET',
 			headers: {
@@ -51,6 +53,7 @@ async function checkPermissions(req, res, next) {
 		});
 
 		let data = await response.json();
+		// Check for permission errors in the response
 		if (data.error) {
 			logger.warn('Permission check failed', { error: data.error, url: req.url, apiKey });
 			res.status(response.status).json({ status: data.error })
