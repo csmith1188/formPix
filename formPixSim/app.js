@@ -116,11 +116,11 @@ state.ws281x.render = renderToWebClients;
 // Main page
 app.get('/', renderIndexPage);
 
-// API Routes
+// API Routes — recordApiActivity first (see middleware comment); mounted under /api so use originalUrl in detector
+app.use('/api', recordApiActivity);
 app.use('/api', checkConnection);
 app.use('/api', checkPermissions);
 app.use('/api', validateQueryParams);
-app.use('/api', recordApiActivity);
 app.use('/api', pixelRoutes);
 app.use('/api', displayRoutes);
 app.use('/api', soundRoutes(webIo));

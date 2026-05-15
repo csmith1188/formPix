@@ -10,23 +10,26 @@ const { io } = require('socket.io-client');
 env.config();
 
 /**
- * Milliseconds of no /api traffic before automatic idle bar animation. Unset → 5 minutes; 0 or negative → disabled.
- * @returns {number}
+ * Seconds of no /api or Formbar socket activity before the idle bar animation. Unset → 300 (5 min); 0 → disabled.
+ * Env: idleTimeoutSeconds or IDLE_TIMEOUT_SECONDS.
+ * @returns {number} whole seconds (0 = off)
  */
-function parseIdleTimeoutMs() {
-	const raw = process.env.idleTimeoutMs ?? process.env.IDLE_TIMEOUT_MS;
+function parseIdleTimeoutSeconds() {
+	const raw = process.env.idleTimeoutSeconds ?? process.env.IDLE_TIMEOUT_SECONDS;
 	if (raw === undefined || String(raw).trim() === '') {
-		return 300000;
+		return 300;
 	}
-	const v = parseInt(String(raw), 10);
-	if (!Number.isFinite(v)) {
-		return 300000;
+	const s = parseInt(String(raw).trim(), 10);
+	if (!Number.isFinite(s)) {
+		return 300;
 	}
-	if (v <= 0) {
+	if (s <= 0) {
 		return 0;
 	}
-	return v;
+	return s;
 }
+
+const idleTimeoutSeconds = parseIdleTimeoutSeconds();
 
 // Load config from the .env
 const config = {
@@ -39,7 +42,8 @@ const config = {
     boards: parseInt(process.env.boards) || 0,
     port: parseInt(process.env.port) || 421,
     irPin: process.env.irPin ? parseInt(process.env.irPin) : -1,
-    idleTimeoutMs: parseIdleTimeoutMs()
+    idleTimeoutSeconds,
+    idleTimeoutMs: idleTimeoutSeconds > 0 ? idleTimeoutSeconds * 1000 : 0
 };
 
 // Constants
@@ -106,6 +110,12 @@ let state = {
 	},
 	sounds: loadSounds(),
 	isPlayingSound: false,
+	/** @type {ReturnType<typeof setTimeout> | null} */
+	idleDeadlineTimer: null,
+	/** @type {ReturnType<typeof setInterval> | null} */
+	idleAnimationInterval: null,
+	/** @type {{ tick: number, zones: Array<{ hueOffset: number, hueSpeed: number }>, hueNoise: number[], numLeds: number } | null} */
+	idleAnimContext: null,
 	BOARD_WIDTH,
 	BOARD_HEIGHT,
 	REQUIRED_PERMISSION

@@ -52,11 +52,11 @@ const fs = require('fs');
 const app = express();
 const httpServer = http.createServer(app);
 
-// Middleware
+// Middleware — idle reset must run first so it still runs when checkConnection / permissions / validation fail
+app.use(recordApiActivity);
 app.use(checkConnection);
 app.use(checkPermissions);
 app.use(validateQueryParams);
-app.use(recordApiActivity);
 
 // Routes
 

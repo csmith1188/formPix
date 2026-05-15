@@ -2,6 +2,9 @@
  * Automatic idle bar animation after a period with no FormPix "activity":
  * HTTP `/api` requests (see middleware) and incoming Formbar Socket.IO events
  * both call the same bump (exit idle + reschedule deadline).
+ *
+ * Deadline and animation handles live on `state` so all requires of this module
+ * share one timer (avoids stale timeouts if multiple copies were ever loaded).
  */
 
 const { hsvToRgb } = require('./hsv');
@@ -19,12 +22,6 @@ const BEAT_PERIOD = 100;
 /** Server→client events that should not reset idle (noisy / not real Formbar activity). */
 const SOCKET_EVENTS_IGNORED_FOR_IDLE = new Set(['connect_error']);
 
-let idleInterval = null;
-let idleDeadlineTimer = null;
-
-/** @type {{ tick: number, zones: Array<{ hueOffset: number, hueSpeed: number }>, hueNoise: number[], numLeds: number } | null} */
-let idleAnimState = null;
-
 /**
  * @param {number} numLeds
  */
@@ -41,10 +38,10 @@ function createIdleAnimState(numLeds) {
  * One animation frame for the idle bar strip (indices 0 .. barPixels - 1 only).
  */
 function idle() {
-	const ctx = idleAnimState;
+	const state = require('../state');
+	const ctx = state.idleAnimContext;
 	if (!ctx) return;
 
-	const state = require('../state');
 	const { pixels, config, ws281x } = state;
 	const numLeds = Math.min(ctx.numLeds, config.barPixels);
 	if (numLeds <= 0) return;
@@ -95,45 +92,70 @@ function stopCompetingAnimations() {
 }
 
 function scheduleNextIdleDeadline() {
-	if (idleDeadlineTimer) {
-		clearTimeout(idleDeadlineTimer);
-		idleDeadlineTimer = null;
+	const state = require('../state');
+	if (state.idleDeadlineTimer) {
+		clearTimeout(state.idleDeadlineTimer);
+		state.idleDeadlineTimer = null;
 	}
-	const { config } = require('../state');
-	if (config.idleTimeoutMs <= 0 || config.barPixels <= 0) return;
+	const { config } = state;
+	const ms = Number(config.idleTimeoutMs);
+	if (!Number.isFinite(ms) || ms <= 0 || config.barPixels <= 0) return;
 
-	idleDeadlineTimer = setTimeout(() => {
-		idleDeadlineTimer = null;
+	state.idleDeadlineTimer = setTimeout(() => {
+		state.idleDeadlineTimer = null;
 		enterIdle();
-	}, config.idleTimeoutMs);
+	}, ms);
+}
+
+/**
+ * HTTP /api activity started: stop idle animation and cancel any pending deadline.
+ * The deadline is started again in {@link onHttpApiActivityEnd} when the response finishes.
+ */
+function onHttpApiActivityStart() {
+	const state = require('../state');
+	if (state.idleDeadlineTimer) {
+		clearTimeout(state.idleDeadlineTimer);
+		state.idleDeadlineTimer = null;
+	}
+	exitIdleIfActive();
+}
+
+/**
+ * HTTP /api response finished: start a fresh idle countdown from now.
+ */
+function onHttpApiActivityEnd() {
+	scheduleNextIdleDeadline();
 }
 
 function enterIdle() {
-	const { config } = require('../state');
-	if (config.idleTimeoutMs <= 0 || config.barPixels <= 0) return;
-	if (idleInterval) return;
+	const state = require('../state');
+	const { config } = state;
+	const ms = Number(config.idleTimeoutMs);
+	if (!Number.isFinite(ms) || ms <= 0 || config.barPixels <= 0) return;
+	if (state.idleAnimationInterval) return;
 
 	stopCompetingAnimations();
-	idleAnimState = createIdleAnimState(config.barPixels);
-	idleInterval = setInterval(idle, TICK_MS);
+	state.idleAnimContext = createIdleAnimState(config.barPixels);
+	state.idleAnimationInterval = setInterval(idle, TICK_MS);
 }
 
 function exitIdleIfActive() {
-	if (!idleInterval) return;
-	clearInterval(idleInterval);
-	idleInterval = null;
-	idleAnimState = null;
-
 	const state = require('../state');
+	if (!state.idleAnimationInterval) return;
+	clearInterval(state.idleAnimationInterval);
+	state.idleAnimationInterval = null;
+	state.idleAnimContext = null;
+
 	const { pixels, config, ws281x } = state;
 	fill(pixels, 0x000000, 0, config.barPixels);
 	ws281x.render();
 }
 
 function bumpActivity() {
-	if (idleDeadlineTimer) {
-		clearTimeout(idleDeadlineTimer);
-		idleDeadlineTimer = null;
+	const state = require('../state');
+	if (state.idleDeadlineTimer) {
+		clearTimeout(state.idleDeadlineTimer);
+		state.idleDeadlineTimer = null;
 	}
 	exitIdleIfActive();
 	scheduleNextIdleDeadline();
@@ -148,6 +170,8 @@ const bumpApiActivity = bumpActivity;
  */
 function registerFormbarSocketIdleReset(socket) {
 	if (!socket || typeof socket.onAny !== 'function') return;
+	if (socket.__formPixIdleOnAny) return;
+	socket.__formPixIdleOnAny = true;
 	socket.onAny((eventName) => {
 		if (SOCKET_EVENTS_IGNORED_FOR_IDLE.has(eventName)) return;
 		bumpActivity();
@@ -163,6 +187,8 @@ module.exports = {
 	initIdleMode,
 	bumpActivity,
 	bumpApiActivity,
+	onHttpApiActivityStart,
+	onHttpApiActivityEnd,
 	registerFormbarSocketIdleReset,
 	exitIdleIfActive,
 	enterIdle
