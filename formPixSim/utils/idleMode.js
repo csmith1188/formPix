@@ -166,14 +166,17 @@ const bumpApiActivity = bumpActivity;
 
 /**
  * When Formbar emits to this Socket.IO client, treat it like `/api` traffic for idle purposes.
+ * Repeating `setClass` with no active class (null / undefined) is ignored so idle can still run
+ * (matches connectionHandlers `handleSetClass` when `userClassId == null`).
  * @param {{ onAny?: (fn: (eventName: string, ...args: unknown[]) => void) => void }} socket
  */
 function registerFormbarSocketIdleReset(socket) {
 	if (!socket || typeof socket.onAny !== 'function') return;
 	if (socket.__formPixIdleOnAny) return;
 	socket.__formPixIdleOnAny = true;
-	socket.onAny((eventName) => {
+	socket.onAny((eventName, ...args) => {
 		if (SOCKET_EVENTS_IGNORED_FOR_IDLE.has(eventName)) return;
+		if (eventName === 'setClass' && args[0] == null) return;
 		bumpActivity();
 	});
 }
