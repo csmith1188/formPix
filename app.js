@@ -17,7 +17,9 @@ const state = require('./state');
 const checkConnection = require('./middleware/checkConnection');
 const checkPermissions = require('./middleware/checkPermissions');
 const validateQueryParams = require('./middleware/validateQueryParams');
+const recordApiActivity = require('./middleware/recordApiActivity');
 const handle404 = require('./middleware/handle404');
+const { initIdleMode, registerFormbarSocketIdleReset } = require('./utils/idleMode');
 
 // Import routes
 const pixelRoutes = require('./routes/pixelRoutes');
@@ -54,6 +56,7 @@ const httpServer = http.createServer(app);
 app.use(checkConnection);
 app.use(checkPermissions);
 app.use(validateQueryParams);
+app.use(recordApiActivity);
 
 // Routes
 
@@ -76,8 +79,7 @@ const socket = io(state.config.formbarUrl, {
 });
 
 state.socket = socket;
-
-// Connection events
+registerFormbarSocketIdleReset(socket);
 socket.on('connect_error', handleConnectError(socket, state.boardIntervals));
 socket.on('connect', handleConnect(socket, state.boardIntervals));
 socket.on('setClass', handleSetClass(socket, state.boardIntervals));
@@ -102,6 +104,7 @@ socket.on('vbTimer', handleVBTimer());
 // ============================================================================
 
 httpServer.listen(state.config.port, () => {
+	initIdleMode();
 	console.log(`Server is up and running on port: ${state.config.port}`);
 
 	// Play bootup sound

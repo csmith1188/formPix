@@ -43,6 +43,24 @@ const env = require('dotenv');
 const { io } = require('socket.io-client');
 env.config();
 
+/**
+ * Milliseconds of no /api traffic before automatic idle bar animation. Unset → 5 minutes; 0 or negative → disabled.
+ * @returns {number}
+ */
+function parseIdleTimeoutMs() {
+	const raw = process.env.idleTimeoutMs ?? process.env.IDLE_TIMEOUT_MS;
+	if (raw === undefined || String(raw).trim() === '') {
+		return 300000;
+	}
+	const v = parseInt(String(raw), 10);
+	if (!Number.isFinite(v)) {
+		return 300000;
+	}
+	if (v <= 0) {
+		return 0;
+	}
+	return v;
+}
 
 // Load config from the .env
 const config = {
@@ -54,7 +72,8 @@ const config = {
 	barPixels: parseInt(process.env.barPixels) || 0,
 	boards: parseInt(process.env.boards) || 0,
 	port: parseInt(process.env.port) || 421,
-	irPin: process.env.irPin ? parseInt(process.env.irPin) : -1
+	irPin: process.env.irPin ? parseInt(process.env.irPin) : -1,
+	idleTimeoutMs: parseIdleTimeoutMs()
 };
 
 // Constants

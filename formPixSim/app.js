@@ -13,7 +13,9 @@ const state = require('./state');
 const checkConnection = require('./middleware/checkConnection');
 const checkPermissions = require('./middleware/checkPermissions');
 const validateQueryParams = require('./middleware/validateQueryParams');
+const recordApiActivity = require('./middleware/recordApiActivity');
 const handle404 = require('./middleware/handle404');
+const { initIdleMode, registerFormbarSocketIdleReset } = require('./utils/idleMode');
 
 // Import routes
 const pixelRoutes = require('./routes/pixelRoutes');
@@ -103,6 +105,7 @@ function handleBrowserConnection(socket) {
  * @returns {Promise<void>} Resolves once startup logging is complete.
  */
 async function onServerStarted() {
+	initIdleMode();
 	console.log(`Server running on port: ${state.config.port}`);
 }
 
@@ -117,6 +120,7 @@ app.get('/', renderIndexPage);
 app.use('/api', checkConnection);
 app.use('/api', checkPermissions);
 app.use('/api', validateQueryParams);
+app.use('/api', recordApiActivity);
 app.use('/api', pixelRoutes);
 app.use('/api', displayRoutes);
 app.use('/api', soundRoutes(webIo));
@@ -137,6 +141,7 @@ webIo.on('connection', handleBrowserConnection);
 // ============================================================================
 
 const socket = state.socket;
+registerFormbarSocketIdleReset(socket);
 
 // Connection events
 socket.on('connect_error', handleConnectError(socket, state.boardIntervals));
